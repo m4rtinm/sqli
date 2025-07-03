@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laboratorio de Hacking: Inyección SQL</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -308,14 +309,110 @@
                 </div>
             </div>
         </div>
+
+        <!-- Menú de Monitoreo de Base de Datos -->
+        <div id="db-monitoring-menu" class="mt-12 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-xl">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-6">🔬 Monitor de Base de Datos</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="challenge-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Seleccionar Base de Datos del Desafío:</label>
+                    <select id="challenge-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-gray-50 dark:bg-gray-700">
+                        <option value="">-- Selecciona un desafío --</option>
+                        <option value="1">Desafío 1: Login Roto</option>
+                        <option value="2">Desafío 2, 4, 5: Buscador/Productos</option>
+                        <option value="3">Desafío 3: Cupón Paciente</option>
+                        <option value="6">Desafío 6: Subconsulta Maliciosa</option>
+                    </select>
+                    <button id="reset-db-button" class="mt-3 w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700 disabled:opacity-50" disabled>
+                        Resetear Base de Datos Seleccionada
+                    </button>
+                </div>
+                <div id="db-info-container" class="p-4 bg-gray-100 dark:bg-gray-900 rounded-lg min-h-[200px] overflow-auto">
+                    <p class="text-gray-500 dark:text-gray-400 text-center">Selecciona una base de datos para ver su estructura y datos.</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
     // --- ESTADO DEL JUEGO Y CONFIGURACIÓN ---
     const state = {
         unlockedLevels: [1],
-        completedLevels: []
+        completedLevels: [],
+        dbInstances: {} // Almacenará las instancias de BBDD para cada desafío
     };
+
+    let SQL; // Variable global para sql.js
+
+    async function initializeSqlJs() {
+        try {
+            SQL = await initSqlJs({
+                locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
+            });
+            console.log("sql.js inicializado correctamente.");
+            await setupAllChallengeDatabases(); // Crear todas las BBDD de los desafíos
+        } catch (err) {
+            console.error("Error inicializando sql.js o configurando bases de datos:", err);
+            // Mostrar un mensaje de error al usuario podría ser una buena idea aquí.
+        }
+    }
+
+    async function setupAllChallengeDatabases() {
+        if (!SQL) {
+            console.error("SQL no está inicializado. No se pueden crear las bases de datos.");
+            return;
+        }
+        console.log("Creando bases de datos para los desafíos...");
+        try {
+            // Desafío 1: Login Roto
+            state.dbInstances[1] = new SQL.Database();
+            state.dbInstances[1].run("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT);");
+            state.dbInstances[1].run("INSERT INTO users (username, password) VALUES ('admin', 'ultra-secret-password-123');");
+            state.dbInstances[1].run("INSERT INTO users (username, password) VALUES ('juan', 'password123');");
+            state.dbInstances[1].run("INSERT INTO users (username, password) VALUES ('ana', 'qwerty');");
+
+            // Desafío 2: Buscador Curioso (y 4, 5)
+            state.dbInstances[2] = new SQL.Database(); // Usaremos la misma para el 4 y 5 para simplificar
+            state.dbInstances[2].run("CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, price REAL);");
+            state.dbInstances[2].run("INSERT INTO products (name, description, price) VALUES ('Laptop Pro', 'Potente laptop para profesionales.', 1200.50);");
+            state.dbInstances[2].run("INSERT INTO products (name, description, price) VALUES ('Teclado Mecánico RGB', 'Teclado con switches cherry-mx.', 75.00);");
+            state.dbInstances[2].run("INSERT INTO products (name, description, price) VALUES ('Monitor Ultrawide', 'Monitor de 34 pulgadas curvo.', 450.99);");
+            // Añadir la tabla users también para el ataque UNION
+            state.dbInstances[2].run("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT, email TEXT);");
+            state.dbInstances[2].run("INSERT INTO users (username, password, email) VALUES ('admin', 'adminPass123!', 'admin@example.com');");
+            state.dbInstances[2].run("INSERT INTO users (username, password, email) VALUES ('user1', 'securePass!', 'user1@example.com');");
+            state.dbInstances[2].run("INSERT INTO users (username, password, email) VALUES ('user2', 'password123', 'user2@example.com');");
+            // Asignar la misma instancia a los desafíos 4 y 5
+            state.dbInstances[4] = state.dbInstances[2];
+            state.dbInstances[5] = state.dbInstances[2];
+
+
+            // Desafío 3: Cupón Paciente
+            state.dbInstances[3] = new SQL.Database();
+            state.dbInstances[3].run("CREATE TABLE coupons (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, discount REAL, expiry_date TEXT);");
+            state.dbInstances[3].run("INSERT INTO coupons (code, discount, expiry_date) VALUES ('SUMMER20', 0.20, '2024-08-31');");
+            state.dbInstances[3].run("INSERT INTO coupons (code, discount, expiry_date) VALUES ('SAVE10NOW', 0.10, '2024-12-31');");
+            // Añadir una función SLEEP simulada (no es SQL estándar pero podemos interceptarla)
+            // No es necesario crearla en SQL, la lógica de SLEEP se manejará en JavaScript.
+
+            // Desafío 6: Subconsulta Maliciosa
+            state.dbInstances[6] = new SQL.Database();
+            state.dbInstances[6].run("CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, owner_id INTEGER);");
+            state.dbInstances[6].run("INSERT INTO items (name, owner_id) VALUES ('Documento Secreto', 1);");
+            state.dbInstances[6].run("INSERT INTO items (name, owner_id) VALUES ('Llave Maestra', 1);");
+            state.dbInstances[6].run("INSERT INTO items (name, owner_id) VALUES ('Notas Públicas', 2);");
+            // Crear tabla users para el desafío
+            state.dbInstances[6].run("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, role TEXT);");
+            state.dbInstances[6].run("INSERT INTO users (username, role) VALUES ('admin', 'administrator');");
+            state.dbInstances[6].run("INSERT INTO users (username, role) VALUES ('guest', 'visitor');");
+
+
+            console.log("Bases de datos de los desafíos creadas y pobladas.");
+        } catch (err) {
+            console.error("Error creando las bases de datos de los desafíos:", err);
+        }
+    }
+
 
     const challenges = {
         1: {
@@ -323,12 +420,39 @@
             inputs: [document.getElementById('input-1-user'), document.getElementById('input-1-pass')],
             resultEl: document.getElementById('result-1'),
             buildQuery: (vals) => `SELECT * FROM users WHERE username = '${vals[0]}' AND password = '${vals[1]}';`,
-            checkSuccess: (vals) => {
-                // Permitir variantes como: admin' OR '1'='1--
+            checkSuccess: (values, query, dbResult) => {
+                // Éxito si la inyección booleana es correcta Y la consulta devuelve al menos un usuario (el admin)
                 const pattern = /(('|\")?\s*or\s*('1'='1|1=1|true)(--)?)/i;
-                return pattern.test(vals[0]) || pattern.test(vals[1]);
+                const isInjectionAttempt = pattern.test(values[0]) || pattern.test(values[1]);
+
+                if (isInjectionAttempt && dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    // Verifica si el usuario 'admin' está en los resultados devueltos por la inyección
+                    return dbResult.data[0].values.some(row => row[1] === 'admin');
+                }
+                // También permitir el login normal si las credenciales son correctas (aunque no es el objetivo del desafío)
+                if (dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                     return dbResult.data[0].values.some(row => row[1] === values[0] && row[2] === values[1]);
+                }
+                return false;
             },
-            analyze: (vals) => {
+            displayResult: function(isSuccess, dbResult, values) {
+                if (isSuccess) {
+                    this.resultEl.innerHTML = `✅ ¡Acceso concedido! Has entrado como <strong>admin</strong>. La puerta al siguiente nivel está abierta.`;
+                    this.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+                } else {
+                    let errorMsg = "❌ Acceso denegado.";
+                    if (dbResult && dbResult.error) {
+                        errorMsg += `<br><small class="text-red-400">Error DB: ${dbResult.error}</small>`;
+                    } else if (dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length === 0) {
+                         errorMsg += " Usuario o contraseña incorrectos.";
+                    } else {
+                        errorMsg += " ¡Sigue intentando!";
+                    }
+                    this.resultEl.innerHTML = errorMsg;
+                    this.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
+                }
+            },
+            analyze: (vals, query) => { // `query` no se usa aquí pero se mantiene la firma
                 const injectionPattern = /'\s*or\s*('[^']*'='\d+'|\d+=\d+|true)/i;
                 const userInjection = vals[0].match(injectionPattern);
                 const passInjection = vals[1].match(injectionPattern);
@@ -366,10 +490,74 @@
             inputs: [document.getElementById('input-2-search')],
             resultEl: document.getElementById('result-2'),
             buildQuery: (vals) => `SELECT name, description FROM products WHERE name LIKE '%${vals[0]}%';`,
-            checkSuccess: (vals) => vals[0].toLowerCase().includes("union select"),
-            analyze: (vals) => {
-                const injection = vals[0].match(/union\s+select\s+username,\s*password\s+from\s+users/i);
-                if (injection) {
+            checkSuccess: (values, query, dbResult) => {
+                // Éxito si la query incluye "UNION SELECT" y devuelve datos que parecen ser de usuarios (ej. 2 columnas)
+                // y al menos una de las columnas devueltas es 'username' o 'password' (simulado, ya que no podemos saber los nombres exactos de las columnas inyectadas)
+                const isUnionAttempt = values[0].toLowerCase().includes("union select");
+                if (isUnionAttempt && dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    const columns = dbResult.data[0].columns;
+                    // Suponemos que la inyección exitosa de 'users' resultará en columnas como 'username', 'password'
+                    // Esto es una simplificación. En un caso real, la estructura de 'users' podría variar.
+                    // Aquí, simplemente verificamos que se devuelvan más de 0 filas de la tabla 'users' (o una tabla con estructura similar)
+                    // y que la consulta original no devuelva resultados de 'products' para asegurar que es la inyección.
+                    const originalQueryPart = query.split(/UNION/i)[0];
+                    let originalResults = [];
+                    try {
+                        originalResults = state.dbInstances[2].exec(originalQueryPart)[0]?.values || [];
+                    } catch(e) {/*ignorar error si la primera parte falla por la inyeccion*/}
+
+                    // Éxito si la inyección UNION devuelve filas y la parte original no devuelve nada (o menos filas que la inyección)
+                    // y la inyección contiene username y password
+                    const injectionPattern = /union\s+select\s+[^,]+,\s*[^,]+\s+from\s+users/i;
+                    if (injectionPattern.test(query) && dbResult.data[0].values.length > 0 && originalResults.length === 0) {
+                        // Comprobar si las columnas extraídas son de la tabla users
+                        const userColumns = ['username', 'password', 'email']; // Columnas esperadas de la tabla users
+                        const resultColumns = dbResult.data[0].columns.map(c => c.toLowerCase());
+                        // Si la inyección es "SELECT username, password FROM users", las columnas devueltas serán "username" y "password"
+                        // Si es "SELECT email, password FROM users", serán "email" y "password", etc.
+                        // La consulta original devuelve "name", "description"
+                        // Si las columnas devueltas NO son "name" y "description", es probable que sea la inyección.
+                        return !(resultColumns.includes('name') && resultColumns.includes('description'));
+                    }
+                }
+                return false;
+            },
+            displayResult: function(isSuccess, dbResult, values) {
+                this.resultEl.innerHTML = ''; // Limpiar resultados anteriores
+                if (isSuccess && dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    this.resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm"><strong>¡PELIGRO!</strong> Se han extraído datos sensibles.</div>`;
+                    const headers = dbResult.data[0].columns;
+                    const dataRows = dbResult.data[0].values;
+
+                    dataRows.forEach(row => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow mt-2';
+                        let rowHtml = '';
+                        row.forEach((cell, index) => {
+                            rowHtml += `<p class="text-sm"><strong class="text-red-400">${headers[index]}:</strong> <span class="font-fira">${cell}</span></p>`;
+                        });
+                        itemEl.innerHTML = rowHtml;
+                        this.resultEl.appendChild(itemEl);
+                    });
+                } else if (dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    // Resultados normales de la búsqueda de productos
+                    const headers = dbResult.data[0].columns;
+                    const dataRows = dbResult.data[0].values;
+                    dataRows.forEach(row => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow mt-2';
+                        itemEl.innerHTML = `<h4 class="font-bold">${row[headers.indexOf('name')]}</h4><p class="text-sm text-gray-600 dark:text-gray-400">${row[headers.indexOf('description')]}</p>`;
+                        this.resultEl.appendChild(itemEl);
+                    });
+                } else if (dbResult && dbResult.error) {
+                     this.resultEl.innerHTML = `<div class="p-3 text-center text-red-500">Error en la consulta: ${dbResult.error}</div>`;
+                } else {
+                     this.resultEl.innerHTML = `<div class="p-3 text-center text-gray-500">No se encontraron resultados.</div>`;
+                }
+            },
+            analyze: (vals, query) => {
+                const injection = query.match(/union\s+select\s+([\w\*\s,]+)\s+from\s+([\w]+)/i);
+                if (injection && injection[2].toLowerCase() === 'users') {
                     return `<div class="space-y-2">
                         <div class="text-red-400 font-bold">🔍 ATAQUE UNION DETECTADO</div>
                         <div class="text-sm">El ataque <span class="sql-red font-mono">UNION SELECT</span> permite combinar resultados de dos consultas:</div>
@@ -398,14 +586,35 @@
             inputs: [document.getElementById('input-3-coupon')],
             resultEl: document.getElementById('result-3'),
             buildQuery: (vals) => `SELECT discount FROM coupons WHERE code = '${vals[0]}';`,
-            checkSuccess: (vals) => {
-                const match = vals[0].match(/sleep\((\d+)\)/i);
-                return match && parseInt(match[1], 10) > 0;
+            checkSuccess: (values, query, dbResult) => {
+                // El éxito se maneja principalmente en handleSubmit para este desafío debido al delay.
+                // Aquí solo verificamos que la query contenga SLEEP(N) con N > 0.
+                // dbResult.success será true si la simulación de SLEEP en handleSubmit fue "exitosa".
+                const match = query.match(/sleep\((\d+)\)/i);
+                return match && parseInt(match[1], 10) > 0 && dbResult && dbResult.success;
             },
-            analyze: (vals) => {
-                const injection = vals[0].match(/sleep\(\d+\)/i);
+            displayResult: function(isSuccess, dbResult, values) {
+                // El mensaje de "Validando cupón..." y el delay se manejan en handleSubmit
+                const couponCode = values[0];
+                if (isSuccess) {
+                     const delay = couponCode.match(/sleep\((\d+)\)/i)[1];
+                    this.resultEl.innerHTML = `✅ ¡Éxito! El servidor tardó ${delay} segundos en responder. Has confirmado una inyección a ciegas.`;
+                    this.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+                } else {
+                    let errorMsg = `❌ El cupón no es válido`;
+                     if (dbResult && dbResult.error) {
+                        errorMsg += `<br><small class="text-red-400">Error DB: ${dbResult.error}</small>`;
+                    } else {
+                        errorMsg += ` y el servidor respondió instantáneamente. No se detectó retraso.`;
+                    }
+                    this.resultEl.innerHTML = errorMsg;
+                    this.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
+                }
+            },
+            analyze: (vals, query) => {
+                const injection = query.match(/sleep\((\d+)\)/i);
                 if (injection) {
-                    const seconds = injection[0].match(/\d+/)[0];
+                    const seconds = injection[1];
                     return `<div class="space-y-2">
                         <div class="text-red-400 font-bold">🔍 INYECCIÓN BASADA EN TIEMPO DETECTADA</div>
                         <div class="text-sm">La función <span class="sql-red font-mono">SLEEP(${seconds})</span> ordena a la base de datos esperar ${seconds} segundos:</div>
@@ -425,9 +634,39 @@
             inputs: [document.getElementById('input-4-search')],
             resultEl: document.getElementById('result-4'),
             buildQuery: (vals) => `SELECT name, description FROM products WHERE name LIKE '%${vals[0]}%';`,
-            checkSuccess: (vals) => /information_schema/i.test(vals[0]) && /(select|floor|rand|count)/i.test(vals[0]),
-            analyze: (vals) => {
-                if (/information_schema/i.test(vals[0]) && /(select|floor|rand|count)/i.test(vals[0])) {
+            checkSuccess: (values, query, dbResult) => {
+                // Éxito si la query contiene una técnica de error-based conocida Y la DB devuelve un error.
+                const isErrorBasedAttempt = /extractvalue|updatexml|floor\(rand\(0\)\*2\)|geometrycollection|polygon|multipoint|linestring|exp\(|information_schema/i.test(query);
+                return isErrorBasedAttempt && dbResult && !dbResult.success && dbResult.error;
+            },
+            displayResult: function(isSuccess, dbResult, values) {
+                this.resultEl.innerHTML = '';
+                const searchTerm = values[0];
+                if (isSuccess && dbResult && dbResult.error) {
+                    this.resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm">
+                        <strong>Error SQL:</strong> <pre class="whitespace-pre-wrap font-fira">${dbResult.error}</pre>
+                    </div>
+                    <div class="mt-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 text-sm">
+                        ✅ <strong>¡Éxito!</strong> Has provocado un error en la base de datos que podría revelar información.
+                        En SQLite, los errores son menos verbosos, pero la técnica es válida.
+                    </div>`;
+                } else if (dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    const headers = dbResult.data[0].columns;
+                    const dataRows = dbResult.data[0].values;
+                    dataRows.forEach(row => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow mt-2';
+                        itemEl.innerHTML = `<h4 class="font-bold">${row[headers.indexOf('name')]}</h4><p class="text-sm text-gray-600 dark:text-gray-400">${row[headers.indexOf('description')]}</p>`;
+                        this.resultEl.appendChild(itemEl);
+                    });
+                } else if (dbResult && !dbResult.success && dbResult.error) {
+                     this.resultEl.innerHTML = `<div class="p-3 text-center text-red-500">Error en la consulta no esperado: ${dbResult.error}</div>`;
+                } else {
+                    this.resultEl.innerHTML = `<div class="p-3 text-center text-gray-500">No se encontraron productos o la consulta no produjo el error esperado.</div>`;
+                }
+            },
+            analyze: (vals, query) => {
+                 if (/extractvalue|updatexml|floor\(rand\(0\)\*2\)|information_schema.*count\(\*\)/i.test(query)) {
                     return `<div class="space-y-2">
                         <div class="text-purple-400 font-bold">🔍 INYECCIÓN BASADA EN ERRORES DETECTADA</div>
                         <div class="text-sm">Has usado <span class="sql-red font-mono">information_schema</span> junto con funciones que pueden provocar errores controlados.</div>
@@ -448,9 +687,39 @@
             inputs: [document.getElementById('input-5-order')],
             resultEl: document.getElementById('result-5'),
             buildQuery: (vals) => `SELECT name, description FROM products ORDER BY ${vals[0]};`,
-            checkSuccess: (vals) => /(select.*from.*users|;.*select|\(.*select.*union)/i.test(vals[0]),
-            analyze: (vals) => {
-                if (/(select.*from.*users|;.*select|\(.*select.*union)/i.test(vals[0])) {
+            checkSuccess: (values, query, dbResult) => {
+                const isComplexInjection = /(case|when|else|end|select|union|;|--)/i.test(values[0]);
+                if (isComplexInjection && dbResult && !dbResult.success && dbResult.error) {
+                    return true;
+                }
+                return false;
+            },
+            displayResult: function(isSuccess, dbResult, values) {
+                this.resultEl.innerHTML = '';
+                if (isSuccess && dbResult && dbResult.error) {
+                    this.resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm">
+                        <strong>Error SQL:</strong> <pre class="whitespace-pre-wrap font-fira">${dbResult.error}</pre>
+                    </div>
+                    <div class="mt-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 text-sm">
+                        ✅ <strong>¡Éxito!</strong> Has manipulado el ORDER BY y provocado un error. En sistemas más permisivos, podrías extraer datos.
+                    </div>`;
+                } else if (dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    const headers = dbResult.data[0].columns;
+                    const dataRows = dbResult.data[0].values;
+                    dataRows.forEach(row => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow mt-2';
+                        itemEl.innerHTML = `<h4 class="font-bold">${row[headers.indexOf('name')]}</h4><p class="text-sm text-gray-600 dark:text-gray-400">${row[headers.indexOf('description')]}</p>`;
+                        this.resultEl.appendChild(itemEl);
+                    });
+                } else if (dbResult && !dbResult.success && dbResult.error) {
+                     this.resultEl.innerHTML = `<div class="p-3 text-center text-red-500">Error en la consulta no esperado: ${dbResult.error}</div>`;
+                } else {
+                    this.resultEl.innerHTML = `<div class="p-3 text-center text-gray-500">La consulta se ejecutó, pero no se detectó la inyección o error esperado.</div>`;
+                }
+            },
+            analyze: (vals, query) => {
+                 if (/(select.*from|;|--|case.*when)/i.test(vals[0])) {
                     return `<div class="space-y-2">
                         <div class="text-pink-400 font-bold">🔍 INYECCIÓN EN ORDER BY DETECTADA</div>
                         <div class="text-sm">Has inyectado SQL en el parámetro ORDER BY para ejecutar consultas adicionales o provocar errores.</div>
@@ -470,10 +739,49 @@
             form: document.getElementById('form-6'),
             inputs: [document.getElementById('input-6-check')],
             resultEl: document.getElementById('result-6'),
-            buildQuery: (vals) => `SELECT * FROM users WHERE username = '${vals[0]}' OR (SELECT COUNT(*) FROM users WHERE username = '${vals[0]}') > 0;`,
-            checkSuccess: (vals) => /(select.*count.*from.*users|where.*username.*and.*password)/i.test(vals[0]),
-            analyze: (vals) => {
-                if (/(select.*count.*from.*users|where.*username.*and.*password)/i.test(vals[0])) {
+            buildQuery: (vals) => `SELECT * FROM items WHERE owner_id = (SELECT id FROM users WHERE username = '${vals[0]}' AND role='administrator');`,
+            checkSuccess: (values, query, dbResult) => {
+                const isAdminInput = values[0].toLowerCase() === 'admin';
+                const isInjectionBypass = /or\s+username\s*=\s*'admin'/i.test(values[0]) || /or\s+'1'\s*=\s*'1'/i.test(values[0]) || /or\s+1\s*=\s*1/i.test(values[0]);
+
+                if (dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    // Si se obtienen items, es un éxito.
+                    // Si el input no era 'admin' pero se usó una inyección para simular ser admin, es el objetivo principal.
+                    if (!isAdminInput && isInjectionBypass) {
+                        return true;
+                    }
+                    // Si el input era 'admin' (sin inyección) y se obtienen items, también es un "éxito" en términos de funcionalidad.
+                    if (isAdminInput && !isInjectionBypass) {
+                        return true;
+                    }
+                }
+                return false;
+            },
+            displayResult: function(isSuccess, dbResult, values) {
+                this.resultEl.innerHTML = '';
+                if (isSuccess && dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    let message = `✅ <strong>¡Acceso concedido!</strong> Se han encontrado los siguientes items:`;
+                    const isAdminInput = values[0].toLowerCase() === 'admin';
+                    const isInjectionBypass = /or\s+username\s*=\s*'admin'/i.test(values[0]) || /or\s+'1'\s*=\s*'1'/i.test(values[0]) || /or\s+1\s*=\s*1/i.test(values[0]);
+
+                    if (!isAdminInput && isInjectionBypass) {
+                        message = `✅ <strong>¡Inyección Exitosa!</strong> Has accedido a los items del administrador:`;
+                    }
+                    this.resultEl.innerHTML = `<div class="p-3 rounded-md bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 text-sm">${message}</div>`;
+                    dbResult.data[0].values.forEach(row => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'p-2 mt-2 bg-gray-50 dark:bg-gray-700/50 rounded text-sm';
+                        itemEl.innerHTML = `<strong>Nombre:</strong> ${row[1]} (Dueño ID: ${row[2]})`; // Asumiendo columnas id, name, owner_id
+                        this.resultEl.appendChild(itemEl);
+                    });
+                } else if (dbResult && !dbResult.success && dbResult.error) {
+                    this.resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm">❌ Error en la consulta: ${dbResult.error}</div>`;
+                } else {
+                    this.resultEl.innerHTML = `<div class="mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200">❌ No se pudo acceder a los items o la subconsulta no devolvió un ID de administrador válido.</div>`;
+                }
+            },
+            analyze: (vals, query) => {
+                 if (/(or\s+username\s*=\s*'admin'|or\s+'1'='1'|or\s+1=1)/i.test(vals[0])) {
                     return `<div class="space-y-2">
                         <div class="text-indigo-400 font-bold">🔍 INYECCIÓN EN SUBCONSULTA DETECTADA</div>
                         <div class="text-sm">Has inyectado una subconsulta que puede saltarse la validación del sistema.</div>
@@ -491,22 +799,15 @@
         }
     };
 
-    // --- SIMULACIÓN DE LA BASE DE DATOS ---
-    const db = {
-        users: [
-            { id: 1, username: 'admin', password: 'ultra-secret-password-123' },
-            { id: 2, username: 'juan', password: 'password123' },
-            { id: 3, username: 'ana', password: 'qwerty' }
-        ],
-        products: [
-            { id: 1, name: 'Laptop Pro', description: 'Potente laptop para profesionales.' },
-            { id: 2, name: 'Teclado Mecánico RGB', description: 'Teclado con switches cherry-mx.' }
-        ]
-    };
-
     // --- LÓGICA PRINCIPAL ---
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+        await initializeSqlJs(); // Esperar a que sql.js se inicialice
         updateUI();
+        setupChallengeHandlers();
+        setupDbMonitoringMenu(); // Configurar el menú de monitoreo
+    });
+
+    function setupChallengeHandlers() {
         Object.keys(challenges).forEach(key => {
             const id = parseInt(key, 10);
             const challenge = challenges[id];
@@ -523,37 +824,39 @@
         });
     });
 
+    function executeQuery(dbInstance, query) {
+        try {
+            const results = dbInstance.exec(query);
+            return { success: true, data: results, error: null };
+        } catch (e) {
+            console.error("Error ejecutando query:", e, "en query:", query);
+            return { success: false, data: [], error: e.message };
+        }
+    }
+
     function handleRealtimeUpdate(id) {
         if (!state.unlockedLevels.includes(id)) return;
         const challenge = challenges[id];
         const values = challenge.inputs.map(i => i.value);
         const query = challenge.buildQuery(values);
-        displayQuery(query);
+        displayQuery(query); // Muestra la query SQL construida
 
-        const analysis = challenge.analyze(values);
+        const analysis = challenge.analyze(values, query); // Pasa la query para análisis más profundo si es necesario
         document.getElementById('analysis-content').innerHTML = analysis;
         
-        // Ajustar altura dinámicamente
         adjustAnalysisPanelHeight();
     }
 
     function adjustAnalysisPanelHeight() {
         const analysisContent = document.getElementById('analysis-content');
         if (analysisContent) {
-            // Resetear altura para obtener el scroll height natural
             analysisContent.style.maxHeight = 'none';
             analysisContent.style.height = 'auto';
-            
-            // Obtener la altura del contenido
             const scrollHeight = analysisContent.scrollHeight;
-            const currentHeight = analysisContent.clientHeight;
-            
-            // Si el contenido es muy largo, establecer un máximo razonable
             if (scrollHeight > 400) {
                 analysisContent.style.maxHeight = '400px';
                 analysisContent.style.overflowY = 'auto';
             } else {
-                // Si es contenido corto, permitir que se expanda naturalmente
                 analysisContent.style.maxHeight = 'none';
                 analysisContent.style.overflowY = 'visible';
                 analysisContent.style.height = `${Math.max(scrollHeight, 80)}px`;
@@ -561,35 +864,49 @@
         }
     }
 
-    function handleSubmit(id) {
-        console.log(`Submit for challenge ${id}`); // Depuración
-        if (!state.unlockedLevels.includes(id)) return;
+    async function handleSubmit(id) {
+        if (!state.unlockedLevels.includes(id) || !SQL) return;
+        console.log(`Submit for challenge ${id}`);
+
         const challenge = challenges[id];
         const values = challenge.inputs.map(i => i.value);
-        const isSuccess = challenge.checkSuccess(values);
+        const query = challenge.buildQuery(values); // La query que el usuario intenta inyectar
 
-        switch(id) {
-            case 1:
-                handleLoginSubmit(isSuccess);
-                break;
-            case 2:
-                handleSearchSubmit(isSuccess, values[0]);
-                break;
-            case 3:
-                handleCouponSubmit(isSuccess, values[0]);
-                break;
-            case 4:
-                handleErrorSubmit(isSuccess, values[0]);
-                break;
-            case 5:
-                handleOrderSubmit(isSuccess, values[0]);
-                break;
-            case 6:
-                handleSubquerySubmit(isSuccess, values[0]);
-                break;
+        let resultFromDB = { success: false, data: [], error: null };
+        let isSuccessBasedOnInjection = false; // Para desafíos que no dependen del resultado de la DB directamente (ej. SLEEP)
+
+        if (id === 3) { // Desafío de Inyección Basada en Tiempo
+            const match = query.match(/SLEEP\((\d+)\)/i);
+            if (match && parseInt(match[1], 10) > 0) {
+                const delay = parseInt(match[1], 10) * 1000;
+                challenge.resultEl.innerHTML = `Validando cupón... <div class="w-4 h-4 border-2 border-dashed rounded-full animate-spin border-blue-500"></div>`;
+                challenge.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-gray-100 dark:bg-gray-700 flex items-center gap-2';
+
+                await new Promise(resolve => setTimeout(resolve, delay));
+                isSuccessBasedOnInjection = true;
+                // No ejecutamos la query en la DB para SLEEP, solo simulamos el retraso.
+                // El `challenge.checkSuccess` para el desafío 3 debe manejar esto.
+                 resultFromDB = { success: true, data: [{columns:['simulated'], values:[['sleep executed']]}] }; // Simular un resultado
+            } else {
+                // Si no hay SLEEP, ejecutar la query normalmente
+                resultFromDB = executeQuery(state.dbInstances[id], query);
+            }
+        } else if (state.dbInstances[id]) {
+            resultFromDB = executeQuery(state.dbInstances[id], query);
+        } else {
+            console.error(`No database instance found for challenge ${id}`);
+            challenge.resultEl.innerHTML = `<div class="text-red-500">Error: No se encontró la base de datos para este desafío.</div>`;
+            return;
         }
 
-        if (isSuccess && !state.completedLevels.includes(id)) {
+        // `checkSuccess` ahora puede tomar la query original, los valores, Y el resultado de la DB.
+        const isSuccess = challenge.checkSuccess(values, query, resultFromDB);
+
+        // Actualizar UI con resultados
+        challenge.displayResult(isSuccess, resultFromDB, values);
+
+
+        if ((isSuccess || isSuccessBasedOnInjection) && !state.completedLevels.includes(id)) {
             state.completedLevels.push(id);
             const nextLevel = id + 1;
             if (challenges[nextLevel] && !state.unlockedLevels.includes(nextLevel)) {
@@ -600,129 +917,9 @@
         }
     }
 
-    // --- MANEJADORES DE RESULTADOS ---
-    function handleLoginSubmit(isSuccess) {
-        const resultEl = challenges[1].resultEl;
-        if (isSuccess) {
-            resultEl.innerHTML = `✅ ¡Acceso concedido! Has entrado como <strong>admin</strong>. La puerta al siguiente nivel está abierta.`;
-            resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
-        } else {
-            resultEl.innerHTML = `❌ Acceso denegado. Usuario o contraseña incorrectos. ¡Sigue intentando!`;
-            resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
-        }
-    }
-
-    function handleSearchSubmit(isSuccess, searchTerm) {
-        const resultEl = challenges[2].resultEl;
-        resultEl.innerHTML = '';
-        if (isSuccess) {
-            resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm"><strong>¡PELIGRO!</strong> Se han extraído datos sensibles de la tabla de usuarios.</div>`;
-            db.users.forEach(user => {
-                const itemEl = document.createElement('div');
-                itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow';
-                itemEl.innerHTML = `<h4 class="font-bold text-red-400">${user.username}</h4><p class="text-sm text-red-400 font-fira">${user.password}</p>`;
-                resultEl.appendChild(itemEl);
-            });
-        } else {
-            const results = db.products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-            if (results.length > 0) {
-                 results.forEach(item => {
-                    const itemEl = document.createElement('div');
-                    itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow';
-                    itemEl.innerHTML = `<h4 class="font-bold">${item.name}</h4><p class="text-sm text-gray-600 dark:text-gray-400">${item.description}</p>`;
-                    resultEl.appendChild(itemEl);
-                });
-            } else {
-                 resultEl.innerHTML = `<div class="p-3 text-center text-gray-500">No se encontraron productos.</div>`;
-            }
-        }
-    }
-    
-    function handleCouponSubmit(isSuccess, couponCode) {
-        const resultEl = challenges[3].resultEl;
-        const match = couponCode.match(/sleep\((\d+)\)/i);
-        const delay = isSuccess ? parseInt(match[1], 10) * 1000 : 0;
-
-        resultEl.innerHTML = `Validando cupón... <div class="w-4 h-4 border-2 border-dashed rounded-full animate-spin border-blue-500"></div>`;
-        resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-gray-100 dark:bg-gray-700 flex items-center gap-2';
-        
-        setTimeout(() => {
-            if (isSuccess) {
-                resultEl.innerHTML = `✅ ¡Éxito! El servidor tardó ${delay/1000} segundos en responder. Has confirmado una inyección a ciegas.`;
-                resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
-            } else {
-                resultEl.innerHTML = `❌ El cupón no es válido y el servidor respondió instantáneamente. No se detectó retraso.`;
-                resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
-            }
-        }, delay);
-    }
-
-    function handleErrorSubmit(isSuccess, searchTerm) {
-        const resultEl = challenges[4].resultEl;
-        resultEl.innerHTML = '';
-        if (isSuccess) {
-            // Simular error de MySQL que revela información
-            resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm">
-                <strong>ERROR MySQL:</strong> Duplicate entry 'shopdb:1' for key 'group_key'<br>
-                <span class="text-xs">Query: SELECT name, description FROM products WHERE name LIKE '%${searchTerm}%'</span>
-            </div>
-            <div class="mt-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 text-sm">
-                ✅ <strong>¡Éxito!</strong> El error reveló que la base de datos se llama <strong>"shopdb"</strong>. En un ataque real, podrías extraer más información sensible.
-            </div>`;
-        } else {
-            const results = db.products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-            if (results.length > 0) {
-                results.forEach(item => {
-                    const itemEl = document.createElement('div');
-                    itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow';
-                    itemEl.innerHTML = `<h4 class="font-bold">${item.name}</h4><p class="text-sm text-gray-600 dark:text-gray-400">${item.description}</p>`;
-                    resultEl.appendChild(itemEl);
-                });
-            } else {
-                resultEl.innerHTML = `<div class="p-3 text-center text-gray-500">No se encontraron productos.</div>`;
-            }
-        }
-    }
-
-    function handleOrderSubmit(isSuccess, orderField) {
-        const resultEl = challenges[5].resultEl;
-        resultEl.innerHTML = '';
-        if (isSuccess) {
-            resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm">
-                <strong>ERROR MySQL:</strong> You have an error in your SQL syntax near '${orderField}' at line 1<br>
-                <span class="text-xs">Query: SELECT name, description FROM products ORDER BY ${orderField}</span>
-            </div>
-            <div class="mt-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 text-sm">
-                ✅ <strong>¡Éxito!</strong> Has manipulado el ORDER BY y provocado un error. En un sistema real, podrías usar esto para extraer datos o ejecutar comandos adicionales.
-            </div>`;
-        } else {
-            // Mostrar productos ordenados normalmente
-            let sortedProducts = [...db.products];
-            if (orderField.toLowerCase() === 'name') {
-                sortedProducts.sort((a, b) => a.name.localeCompare(b.name));
-            } else if (orderField.toLowerCase() === 'description') {
-                sortedProducts.sort((a, b) => a.description.localeCompare(b.description));
-            }
-            
-            sortedProducts.forEach(item => {
-                const itemEl = document.createElement('div');
-                itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow';
-                itemEl.innerHTML = `<h4 class="font-bold">${item.name}</h4><p class="text-sm text-gray-600 dark:text-gray-400">${item.description}</p>`;
-                resultEl.appendChild(itemEl);
-            });
-        }
-    }
-
-    function handleSubquerySubmit(isSuccess, checkValue) {
-        const resultEl = challenges[6].resultEl;
-        if (isSuccess) {
-            resultEl.innerHTML = `✅ <strong>¡Acceso concedido!</strong> La subconsulta maliciosa devolvió TRUE, saltándose la validación del sistema.`;
-            resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
-        } else {
-            resultEl.innerHTML = `❌ Valor no válido. El sistema no pudo encontrar coincidencias para "${checkValue}".`;
-            resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
-        }
-    }
+    // --- MANEJADORES DE RESULTADOS (ahora parte de `challenges[id].displayResult`) ---
+    // Las funciones handleLoginSubmit, handleSearchSubmit, etc., serán reemplazadas o integradas
+    // en una nueva propiedad `displayResult` dentro de cada objeto `challenge`.
 
     // --- FUNCIONES DE UI ---
     function updateUI() {
@@ -1030,6 +1227,145 @@
         
         breakdown += '</div>';
         breakdownEl.innerHTML = breakdown;
+    }
+
+    // --- LÓGICA DEL MENÚ DE MONITOREO DE BASE DE DATOS ---
+    function setupDbMonitoringMenu() {
+        const selectEl = document.getElementById('challenge-select');
+        const dbInfoContainer = document.getElementById('db-info-container');
+        const resetButton = document.getElementById('reset-db-button');
+
+        selectEl.addEventListener('change', async (event) => {
+            const challengeId = event.target.value;
+            if (!challengeId || !SQL) {
+                dbInfoContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Selecciona una base de datos para ver su estructura y datos.</p>';
+                resetButton.disabled = true;
+                return;
+            }
+
+            resetButton.disabled = false;
+            const db = state.dbInstances[challengeId];
+            if (!db) {
+                dbInfoContainer.innerHTML = '<p class="text-red-500 text-center">Error: No se encontró la instancia de base de datos para este desafío.</p>';
+                return;
+            }
+
+            displayDbInfo(db, dbInfoContainer, challengeId);
+        });
+
+        resetButton.addEventListener('click', async () => {
+            const challengeId = selectEl.value;
+            if (!challengeId || !SQL) return;
+
+            console.log(`Reseteando base de datos para el desafío ${challengeId}...`);
+            try {
+                // Re-crear la instancia de la base de datos específica
+                // Esto requiere que las funciones de creación sean modulares o una función general.
+                // Por ahora, vamos a re-ejecutar la parte relevante de setupAllChallengeDatabases.
+                // Esto es una simplificación; idealmente, tendrías funciones separadas por DB.
+
+                // Guardar la base de datos antigua por si falla la recreación
+                const oldDb = state.dbInstances[challengeId];
+
+                if (challengeId === "1") {
+                    state.dbInstances[1] = new SQL.Database();
+                    state.dbInstances[1].run("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT);");
+                    state.dbInstances[1].run("INSERT INTO users (username, password) VALUES ('admin', 'ultra-secret-password-123');");
+                    state.dbInstances[1].run("INSERT INTO users (username, password) VALUES ('juan', 'password123');");
+                    state.dbInstances[1].run("INSERT INTO users (username, password) VALUES ('ana', 'qwerty');");
+                } else if (challengeId === "2") { // Cubre 2, 4, 5
+                    state.dbInstances[2] = new SQL.Database();
+                    state.dbInstances[2].run("CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, price REAL);");
+                    state.dbInstances[2].run("INSERT INTO products (name, description, price) VALUES ('Laptop Pro', 'Potente laptop para profesionales.', 1200.50);");
+                    state.dbInstances[2].run("INSERT INTO products (name, description, price) VALUES ('Teclado Mecánico RGB', 'Teclado con switches cherry-mx.', 75.00);");
+                    state.dbInstances[2].run("INSERT INTO products (name, description, price) VALUES ('Monitor Ultrawide', 'Monitor de 34 pulgadas curvo.', 450.99);");
+                    state.dbInstances[2].run("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT, email TEXT);");
+                    state.dbInstances[2].run("INSERT INTO users (username, password, email) VALUES ('admin', 'adminPass123!', 'admin@example.com');");
+                    state.dbInstances[2].run("INSERT INTO users (username, password, email) VALUES ('user1', 'securePass!', 'user1@example.com');");
+                    state.dbInstances[2].run("INSERT INTO users (username, password, email) VALUES ('user2', 'password123', 'user2@example.com');");
+                    state.dbInstances[4] = state.dbInstances[2];
+                    state.dbInstances[5] = state.dbInstances[2];
+                } else if (challengeId === "3") {
+                    state.dbInstances[3] = new SQL.Database();
+                    state.dbInstances[3].run("CREATE TABLE coupons (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, discount REAL, expiry_date TEXT);");
+                    state.dbInstances[3].run("INSERT INTO coupons (code, discount, expiry_date) VALUES ('SUMMER20', 0.20, '2024-08-31');");
+                    state.dbInstances[3].run("INSERT INTO coupons (code, discount, expiry_date) VALUES ('SAVE10NOW', 0.10, '2024-12-31');");
+                } else if (challengeId === "6") {
+                    state.dbInstances[6] = new SQL.Database();
+                    state.dbInstances[6].run("CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, owner_id INTEGER);");
+                    state.dbInstances[6].run("INSERT INTO items (name, owner_id) VALUES ('Documento Secreto', 1);");
+                    state.dbInstances[6].run("INSERT INTO items (name, owner_id) VALUES ('Llave Maestra', 1);");
+                    state.dbInstances[6].run("INSERT INTO items (name, owner_id) VALUES ('Notas Públicas', 2);");
+                    state.dbInstances[6].run("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, role TEXT);");
+                    state.dbInstances[6].run("INSERT INTO users (username, role) VALUES ('admin', 'administrator');");
+                    state.dbInstances[6].run("INSERT INTO users (username, role) VALUES ('guest', 'visitor');");
+                }
+
+                console.log(`Base de datos para el desafío ${challengeId} reseteada.`);
+                showToast(`Base de datos del desafío ${challengeId} reseteada.`);
+                // Refrescar la vista
+                displayDbInfo(state.dbInstances[challengeId], dbInfoContainer, challengeId);
+
+            } catch (err) {
+                console.error(`Error reseteando la base de datos del desafío ${challengeId}:`, err);
+                dbInfoContainer.innerHTML = `<p class="text-red-500 text-center">Error al resetear la base de datos: ${err.message}</p>`;
+                // Restaurar la base de datos antigua si es posible (o re-inicializar todo)
+                // state.dbInstances[challengeId] = oldDb; // Podría no ser seguro si oldDb fue cerrado o corrupto
+            }
+        });
+    }
+
+    function displayDbInfo(db, container, challengeId) {
+        container.innerHTML = ''; // Limpiar contenido anterior
+
+        try {
+            // Obtener lista de tablas
+            const tablesResult = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';");
+
+            if (!tablesResult || tablesResult.length === 0 || tablesResult[0].values.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">No hay tablas en esta base de datos.</p>';
+                return;
+            }
+
+            const tableNames = tablesResult[0].values.flat();
+            let htmlContent = `<h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3">Esquema y Datos (Desafío ${challengeId})</h3>`;
+
+            tableNames.forEach(tableName => {
+                htmlContent += `<div class="mb-4 p-3 bg-gray-200 dark:bg-gray-800 rounded">`;
+                htmlContent += `<h4 class="text-md font-semibold text-blue-600 dark:text-blue-400 mb-1">${tableName}</h4>`;
+
+                // Obtener esquema de la tabla
+                const schemaResult = db.exec(`PRAGMA table_info(${tableName});`);
+                if (schemaResult && schemaResult.length > 0) {
+                    htmlContent += `<p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Columnas: ${schemaResult[0].values.map(col => `${col[1]} (${col[2]})`).join(', ')}</p>`;
+                }
+
+                // Obtener datos de la tabla (limitar a, por ejemplo, 10 filas para evitar sobrecargar)
+                const dataResult = db.exec(`SELECT * FROM ${tableName} LIMIT 10;`);
+                if (dataResult && dataResult.length > 0 && dataResult[0].values.length > 0) {
+                    htmlContent += `<table class="min-w-full text-xs divide-y divide-gray-300 dark:divide-gray-700">
+                                        <thead class="bg-gray-50 dark:bg-gray-700">
+                                            <tr>${dataResult[0].columns.map(col => `<th class="px-2 py-1 text-left font-medium text-gray-500 dark:text-gray-300">${col}</th>`).join('')}</tr>
+                                        </thead>
+                                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">`;
+                    dataResult[0].values.forEach(row => {
+                        htmlContent += `<tr>${row.map(cell => `<td class="px-2 py-1 whitespace-nowrap text-gray-700 dark:text-gray-200 font-fira">${cell === null ? 'NULL' : cell}</td>`).join('')}</tr>`;
+                    });
+                    htmlContent += `</tbody></table>`;
+                    if (dataResult[0].values.length === 10) {
+                         htmlContent += `<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Mostrando las primeras 10 filas.</p>`;
+                    }
+                } else {
+                    htmlContent += `<p class="text-xs text-gray-500 dark:text-gray-400">La tabla está vacía.</p>`;
+                }
+                htmlContent += `</div>`;
+            });
+            container.innerHTML = htmlContent;
+
+        } catch (e) {
+            console.error("Error mostrando información de la BD:", e);
+            container.innerHTML = `<p class="text-red-500 text-center">Error al obtener información de la base de datos: ${e.message}</p>`;
+        }
     }
 
     </script>
