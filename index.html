@@ -237,7 +237,7 @@
                         </form>
                         <div class="mt-2 text-right"><button onclick="toggleHint(5)" class="text-sm text-pink-500 hover:underline">Necesito una pista</button></div>
                         <p id="hint-5" class="hidden mt-2 p-2 bg-pink-50 dark:bg-pink-900/20 text-sm rounded">
-                            El campo ORDER BY normalmente acepta nombres de columnas como 'name' o 'id'. ¿Qué pasaría si intentas inyectar SQL después de un punto y coma <code class="font-fira">;</code> o usar subconsultas con <code class="font-fira">UNION SELECT</code>?
+                            En SQLite, el <code class="font-fira">ORDER BY</code> es menos flexible para inyecciones directas de <code class="font-fira">UNION SELECT</code> que en otros SGBD. Intenta provocar un error SQL con una subconsulta inválida, o usa expresiones <code class="font-fira">CASE WHEN...END</code> para inferir datos alterando el orden. Un <code class="font-fira">UNION SELECT</code> que sea aceptado sintácticamente (aunque no muestre datos de otra tabla limpiamente) también es una manipulación.
                         </p>
                         <div id="result-5" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
                     </div>
@@ -251,7 +251,7 @@
                     </div>
                     <div class="challenge-content">
                         <p class="mt-2 text-gray-600 dark:text-gray-400">
-                            El sistema usa subconsultas para validar datos. Intenta inyectar una subconsulta para filtrar información sensible.
+                            El sistema usa una subconsulta para obtener un <code class="font-fira">owner_id</code> basado en tu entrada: <code class="font-fira">(SELECT id FROM users WHERE username = '[INPUT]' AND role='administrator')</code>. Intenta inyectar en el campo <code class="font-fira">[INPUT]</code> para que la subconsulta devuelva el <code class="font-fira">id</code> del administrador, incluso si no sabes su nombre de usuario.
                         </p>
                         <form id="form-6" class="flex gap-2 mt-4">
                             <input type="text" id="input-6-check" placeholder="Introduce un valor..." class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-gray-50 dark:bg-gray-700 font-fira p-2">
@@ -259,7 +259,7 @@
                         </form>
                         <div class="mt-2 text-right"><button onclick="toggleHint(6)" class="text-sm text-indigo-500 hover:underline">Necesito una pista</button></div>
                         <p id="hint-6" class="hidden mt-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 text-sm rounded">
-                            Las subconsultas pueden devolver TRUE o FALSE. Si puedes hacer que una subconsulta con <code class="font-fira">SELECT COUNT(*)</code> devuelva un número mayor que 0, podrías saltarte la validación. Piensa en condiciones que siempre sean verdaderas.
+                            La subconsulta busca un <code class="font-fira">username</code> específico Y que el <code class="font-fira">role</code> sea <code class="font-fira">'administrator'</code>. Si inyectas algo como <code class="font-fira">x' OR username='admin</code> (asumiendo que 'admin' es el administrador), la condición <code class="font-fira">username='admin' AND role='administrator'</code> podría volverse verdadera.
                         </p>
                         <div id="result-6" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
                     </div>
@@ -691,22 +691,65 @@
             resultEl: document.getElementById('result-5'),
             buildQuery: (vals) => `SELECT name, description FROM products ORDER BY ${vals[0]};`,
             checkSuccess: (values, query, dbResult) => {
-                const isComplexInjection = /(case|when|else|end|select|union|;|--)/i.test(values[0]);
-                if (isComplexInjection && dbResult && !dbResult.success && dbResult.error) {
-                    return true;
+                const userInput = values[0].toLowerCase();
+                const isUnionSelectAttempt = /union\s+select/i.test(userInput);
+                const isCaseExpressionAttempt = /case\s+when/i.test(userInput);
+                const causesError = dbResult && !dbResult.success && dbResult.error;
+
+                // Escenario 1: La inyección causa un error (y no es un simple error de columna no existente si no es complejo)
+                if (causesError) {
+                    if (isUnionSelectAttempt || isCaseExpressionAttempt || userInput.includes(";") || userInput.includes("--")) {
+                        return { success: true, type: "ERROR_BASED" };
+                    }
+                    // Si no es una inyección compleja reconocida pero aun así causa error (ej. 'columna_inexistente'), no es el objetivo principal.
+                    // Pero si el usuario intenta algo como 'name; DROP TABLE users', el error es el éxito.
+                    if (userInput.includes(";") || userInput.includes("--")) return { success: true, type: "ERROR_BASED" };
+
+                    // Considerar un error por subconsulta inválida como éxito también
+                    if (userInput.includes("select") && causesError) return { success: true, type: "ERROR_BASED" };
+
+                    return { success: false, type: "GENERIC_ERROR_NOT_ADVANCING" }; // Error genérico, no avanza.
                 }
-                return false;
+
+                // Escenario 2: Se usa UNION SELECT y la query se ejecuta sin error (SQLite lo aceptó sintácticamente)
+                if (isUnionSelectAttempt && dbResult && dbResult.success) {
+                     // Y que devuelva datos (aunque sean los originales, la manipulación sintáctica es el punto aquí)
+                    if (dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                        return { success: true, type: "UNION_ACCEPTED" };
+                    }
+                }
+
+                // Escenario 3: Se usa una expresión CASE y la query se ejecuta (el cambio de orden sería la prueba)
+                // Esto es difícil de verificar automáticamente sin conocer los datos esperados.
+                // Por ahora, si incluye CASE y no da error, lo tomamos como un intento válido.
+                if (isCaseExpressionAttempt && dbResult && dbResult.success) {
+                     return { success: true, type: "CASE_ACCEPTED" };
+                }
+
+                return { success: false, type: "NO_EFFECT" };
             },
-            displayResult: function(isSuccess, dbResult, values) {
+            displayResult: function(outcome, dbResult, values) { // outcome es el objeto de checkSuccess
                 this.resultEl.innerHTML = '';
-                if (isSuccess && dbResult && dbResult.error) {
-                    this.resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm">
-                        <strong>Error SQL:</strong> <pre class="whitespace-pre-wrap font-fira">${dbResult.error}</pre>
-                    </div>
-                    <div class="mt-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 text-sm">
-                        ✅ <strong>¡Éxito!</strong> Has manipulado el ORDER BY y provocado un error. En sistemas más permisivos, podrías extraer datos.
-                    </div>`;
+                if (outcome.success) {
+                    if (outcome.type === "ERROR_BASED" && dbResult && dbResult.error) {
+                        this.resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm">
+                            <strong>Error SQL Provocado:</strong> <pre class="whitespace-pre-wrap font-fira">${dbResult.error}</pre>
+                        </div>
+                        <div class="mt-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 text-sm">
+                            ✅ <strong>¡Éxito!</strong> Has manipulado el ORDER BY y provocado un error con tu inyección.
+                        </div>`;
+                    } else if (outcome.type === "UNION_ACCEPTED") {
+                         this.resultEl.innerHTML = `<div class="p-3 rounded-md bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 text-sm">
+                            ✅ <strong>¡Éxito!</strong> SQLite aceptó tu <code class="font-fira">UNION SELECT</code> en la cláusula ORDER BY. Aunque la extracción de datos directa es compleja aquí, has alterado la consulta.
+                        </div>`;
+                    } else if (outcome.type === "CASE_ACCEPTED") {
+                        this.resultEl.innerHTML = `<div class="p-3 rounded-md bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 text-sm">
+                           ✅ <strong>¡Éxito!</strong> SQLite aceptó tu expresión <code class="font-fira">CASE</code> en la cláusula ORDER BY. Podrías usar esto para inferir datos booleanos alterando el orden de los resultados.
+                       </div>`;
+                   }
+                     this.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
                 } else if (dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    // No hubo éxito en la inyección, pero se muestran datos ordenados normalmente.
                     const headers = dbResult.data[0].columns;
                     const dataRows = dbResult.data[0].values;
                     dataRows.forEach(row => {
@@ -722,20 +765,22 @@
                 }
             },
             analyze: (vals, query) => {
-                 if (/(select.*from|;|--|case.*when)/i.test(vals[0])) {
+                const userInput = vals[0];
+                // Regex mejorada para detectar varios patrones de inyección en ORDER BY
+                if (/(union\s+select|case\s+when|select\s*\(|(?:^|,|\s)\(select\s|;\s*\w|--)/i.test(userInput)) {
                     return `<div class="space-y-2">
                         <div class="text-pink-400 font-bold">🔍 INYECCIÓN EN ORDER BY DETECTADA</div>
-                        <div class="text-sm">Has inyectado SQL en el parámetro ORDER BY para ejecutar consultas adicionales o provocar errores.</div>
+                        <div class="text-sm">Has intentado una inyección compleja en la cláusula ORDER BY.</div>
                         <div class="bg-gray-700 p-2 rounded text-xs font-mono">
-                            <div>ORDER BY ${vals[0]}</div>
+                            <div>ORDER BY ${userInput}</div>
                         </div>
-                        <div class="text-sm text-yellow-300">⚠️ En sistemas reales, esto puede permitir la extracción de datos o ejecución de comandos arbitrarios.</div>
+                        <div class="text-sm text-yellow-300">⚠️ En SQLite, inyectar directamente <code class="font-fira">SELECT</code> o <code class="font-fira">UNION</code> en ORDER BY a menudo causa errores o tiene un comportamiento no estándar. Las expresiones <code class="font-fira">CASE</code> o provocar errores controlados son técnicas más comunes para inferir datos. <code class="font-fira">information_schema</code> no está disponible en SQLite.</div>
                     </div>`;
                 }
-                if (/;|union|select/i.test(vals[0])) {
-                    return '<div class="text-yellow-400">Detectadas palabras clave SQL. Intenta combinarlas para crear una inyección más compleja que extraiga datos de la tabla users.</div>';
+                 if (/information_schema/i.test(userInput)) { // Específicamente para information_schema
+                    return `<div class="text-yellow-400">Detectado <code class="font-fira">information_schema</code>. Recuerda que SQLite no usa <code class="font-fira">information_schema</code> como MySQL/PostgreSQL. Intenta con expresiones <code class="font-fira">CASE</code> o subconsultas que puedan alterar el orden o provocar errores específicos de SQLite.</div>`;
                 }
-                return '<div class="text-gray-400">El parámetro ORDER BY puede ser vulnerable. Intenta inyectar SQL usando <code>;</code> seguido de consultas o subconsultas con <code>UNION SELECT</code>.</div>';
+                return '<div class="text-gray-400">El parámetro ORDER BY puede ser vulnerable. Intenta con expresiones <code class="font-fira">CASE WHEN...END</code>, subconsultas simples que devuelvan un valor (ej. <code class="font-fira">(SELECT count(*) FROM users)</code>), o intenta provocar un error SQL para ver si el sistema es vulnerable.</div>';
             }
         },
         6: {
@@ -921,9 +966,11 @@
         if (id === 1) {
             allowLevelAdvance = challengeOutcome.status === 'INJECTION_SUCCESS';
         } else if (id === 3) { // Desafío de tiempo
-            allowLevelAdvance = isSuccessBasedOnInjection || challengeOutcome; // challengeOutcome es el booleano de checkSuccess
+            allowLevelAdvance = isSuccessBasedOnInjection || challengeOutcome; // challengeOutcome es el booleano de checkSuccess (devuelve true/false)
+        } else if (id === 5) {
+            allowLevelAdvance = challengeOutcome.success; // challengeOutcome es {success: bool, type: string}
         }
-         else { // Para otros desafíos (2, 4, 5, 6)
+         else { // Para otros desafíos (2, 4, 6)
             allowLevelAdvance = challengeOutcome; // challengeOutcome es el booleano de checkSuccess
         }
 
