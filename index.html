@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratorio de Hacking: Inyección SQL</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-fira { font-family: 'Fira Code', monospace; }
+        .sql-blue { color: #569cd6; font-weight: bold; }
+        .sql-green { color: #ce9178; font-weight: 500; }
+        .sql-red { 
+            background-color: rgba(255, 40, 40, 0.6) !important; 
+            border-radius: 6px; 
+            padding: 3px 6px !important; 
+            border: 2px solid #ff3333 !important;
+            position: relative;
+            font-weight: bold !important;
+            color: #ffffff !important;
+            text-shadow: 0 0 4px rgba(255, 0, 0, 0.8);
+            box-shadow: 0 0 8px rgba(255, 40, 40, 0.5);
+            animation: pulseRed 2s infinite;
+        }
+        .sql-gray { color: #6a9955; font-weight: 500; }
+        @keyframes pulseRed {
+            0%, 100% { 
+                background-color: rgba(255, 40, 40, 0.6);
+                box-shadow: 0 0 8px rgba(255, 40, 40, 0.5);
+            }
+            50% { 
+                background-color: rgba(255, 60, 60, 0.8);
+                box-shadow: 0 0 12px rgba(255, 40, 40, 0.8);
+            }
+        }
+        .sql-red::before {
+            content: "⚠️ INYECCIÓN";
+            position: absolute;
+            top: -22px;
+            left: 0;
+            font-size: 10px;
+            background: #ff3333;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 10;
+            border: 1px solid #fff;
+        }
+        .query-structure {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            border-left: 4px solid #569cd6;
+        }
+        .vulnerability-indicator {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .vuln-safe { background: #22c55e; color: white; }
+        .vuln-warning { background: #f59e0b; color: white; }
+        .vuln-danger { background: #ef4444; color: white; }
+        .smooth-scroll { scroll-behavior: smooth; }
+        .challenge-card.locked {
+            opacity: 0.6;
+            background-color: #f3f4f6;
+        }
+        .challenge-card.locked .challenge-content {
+            filter: blur(2px);
+        }
+        .challenge-card.completed {
+            border-left-color: #22c55e;
+        }
+        .toast {
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease-in-out;
+        }
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+
+    <!-- Notificación Toast -->
+    <div id="toast" class="toast fixed bottom-5 right-5 bg-green-500 text-white py-3 px-6 rounded-lg shadow-xl z-50">
+        <p id="toast-message">¡Nivel desbloqueado!</p>
+    </div>
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-blue-600 dark:text-blue-400">Laboratorio de Hacking: SQLi</h1>
+            <p class="mt-2 text-lg text-gray-600 dark:text-gray-400">Completa los desafíos para convertirte en un experto en Inyección SQL.</p>
+        </header>
+
+        <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mb-8">
+            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full relative overflow-hidden" style="width: 0%; transition: width 0.5s ease-in-out;">
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse"></div>
+            </div>
+        </div>
+        <div class="text-center mb-4">
+            <span id="progress-text" class="text-sm text-gray-600 dark:text-gray-400">0% completado - ¡Comienza tu aventura!</span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Panel Izquierdo: Desafíos -->
+            <div class="space-y-6">
+                <h2 class="text-2xl font-bold">🎯 Desafíos de Inyección</h2>
+                
+                <!-- Desafío 1: Inyección Clásica -->
+                <div id="challenge-1" class="challenge-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">Nivel 1: El Login Roto</h3>
+                        <span class="text-xs font-medium mr-2 px-2.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Clásica / Booleana</span>
+                    </div>
+                    <div class="challenge-content">
+                        <p class="mt-2 text-gray-600 dark:text-gray-400">La página de login de "ShopSafe" es vulnerable. Tu misión: acceder como <code class="font-fira text-sm">'admin'</code> sin saber la contraseña.</p>
+                        <form id="form-1" class="space-y-4 mt-4">
+                            <input type="text" id="input-1-user" placeholder="Usuario" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-gray-50 dark:bg-gray-700 font-fira p-2" value="admin">
+                            <input type="password" id="input-1-pass" placeholder="Contraseña" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-gray-50 dark:bg-gray-700 font-fira p-2">
+                            <button type="submit" class="w-full bg-blue-600 text-white font-bold py button:hover="bg-blue-700" py-2 px-4 rounded-md hover:bg-blue-700">Intentar Inyección</button>
+                        </form>
+                        <div class="mt-2 text-right"><button onclick="toggleHint(1)" class="text-sm text-blue-500 hover:underline">Necesito una pista</button></div>
+                        <p id="hint-1" class="hidden mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 text-sm rounded">Intenta usar una condición que siempre sea verdadera, como <code class="font-fira">' OR '1'='1</code>, y luego comenta el resto de la consulta con <code class="font-fira">--</code>.</p>
+                        <div id="result-1" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
+                    </div>
+                </div>
+
+                <!-- Desafío 2: Ataque de UNION -->
+                <div id="challenge-2" class="challenge-card locked bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-gray-500">
+                     <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">Nivel 2: El Buscador Curioso</h3>
+                        <span class="text-xs font-medium mr-2 px-2.5 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">Ataque UNION</span>
+                    </div>
+                    <div class="challenge-content">
+                        <p class="mt-2 text-gray-600 dark:text-gray-400">El buscador de productos es vulnerable. Usa un ataque <code class="font-fira">UNION</code> para extraer los nombres de usuario y contraseñas de la tabla <code class="font-fira">'users'</code>.</p>
+                        <form id="form-2" class="flex gap-2 mt-4">
+                            <input type="text" id="input-2-search" placeholder="Buscar producto..." class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-gray-50 dark:bg-gray-700 font-fira p-2">
+                            <button type="submit" class="bg-yellow-500 text-white font-bold py-2 px-4 rounded-md hover:bg-yellow-600">Buscar</button>
+                        </form>
+                        <div class="mt-2 text-right"><button onclick="toggleHint(2)" class="text-sm text-yellow-500 hover:underline">Necesito una pista</button></div>
+                        <p id="hint-2" class="hidden mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 text-sm rounded">La consulta original selecciona 2 columnas. Cierra la cadena con <code class="font-fira">'</code> y luego une una consulta que seleccione 2 columnas de la tabla <code class="font-fira">users</code>, como <code class="font-fira">username, password</code>.</p>
+                        <div id="result-2" class="mt-4 space-y-2"></div>
+                    </div>
+                </div>
+
+                <!-- Desafío 3: Inyección a Ciegas -->
+                <div id="challenge-3" class="challenge-card locked bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-gray-500">
+                     <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">Nivel 3: El Cupón Paciente</h3>
+                        <span class="text-xs font-medium mr-2 px-2.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">A Ciegas / Basada en Tiempo</span>
+                    </div>
+                    <div class="challenge-content">
+                        <p class="mt-2 text-gray-600 dark:text-gray-400">No verás un error ni datos, pero puedes confirmar la vulnerabilidad si el servidor tarda en responder. Inyecta un comando que cause un retraso de 3 segundos.</p>
+                        <form id="form-3" class="flex gap-2 mt-4">
+                            <input type="text" id="input-3-coupon" placeholder="Código de cupón..." class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-gray-50 dark:bg-gray-700 font-fira p-2">
+                            <button type="submit" class="bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">Validar</button>
+                        </form>
+                        <div class="mt-2 text-right"><button onclick="toggleHint(3)" class="text-sm text-red-500 hover:underline">Necesito una pista</button></div>
+                        <p id="hint-3" class="hidden mt-2 p-2 bg-red-50 dark:bg-red-900/20 text-sm rounded">Usa un payload que ejecute una función de espera. Para esta demo, la función se llama <code class="font-fira">SLEEP(seconds)</code>. Prueba con algo como <code class="font-fira">' AND SLEEP(3)--</code>.</p>
+                        <div id="result-3" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Panel Derecho: Vista del Servidor -->
+            <div class="bg-gray-900 rounded-xl shadow-2xl p-6 flex flex-col sticky top-8 h-max">
+                <h2 class="text-2xl font-bold text-gray-200">🖥️ Vista del "Servidor"</h2>
+                
+                <!-- Consulta SQL en tiempo real -->
+                <div class="mt-4">
+                    <h3 class="font-semibold text-gray-300 mb-2">Server: SQL Query Log</h3>
+                    <div class="bg-black rounded-lg p-4 font-fira text-sm overflow-x-auto border border-gray-700" id="query-container">
+                        <pre id="sql-query-display" class="text-gray-300 m-0 whitespace-pre-wrap leading-relaxed">// Esperando una interacción...</pre>
+                    </div>
+                    
+                    <!-- Indicador de vulnerabilidad -->
+                    <div class="mt-2 flex items-center justify-between">
+                        <span id="vulnerability-status" class="vulnerability-indicator vuln-safe">SEGURA</span>
+                        <span id="injection-type" class="text-xs text-gray-400"></span>
+                    </div>
+                   <!-- Consulta desglosada en tiempo real -->
+                   <div class="mt-4">
+                       <h3 class="font-semibold text-gray-300 mb-2">Consulta paso a paso</h3>
+                       <div class="bg-gray-800 rounded-lg p-4 font-fira text-sm overflow-x-auto border border-gray-700" id="query-step-container">
+                           <pre id="sql-query-step" class="text-gray-300 m-0 whitespace-pre-wrap leading-relaxed">// Esperando una interacción...</pre>
+                       </div>
+                   </div>
+                </div>
+
+                <!-- Análisis detallado -->
+                <div id="analysis-box" class="mt-4">
+                     <h3 class="font-semibold text-gray-300 mb-2">� Huntington Beach Fire Department🔬 Análisis del Payload</h3>
+                     <div id="analysis-content" class="p-3 bg-gray-800 rounded-lg text-sm text-gray-300 min-h-[80px] overflow-y-auto max-h-[200px]">
+                        💡 Escribe en un campo para ver el análisis en tiempo real.
+                     </div>
+                </div>
+
+                <!-- Estructura de la consulta -->
+                <div id="query-breakdown" class="mt-4">
+                    <h3 class="font-semibold text-gray-300 mb-2">🧩 Estructura de la Consulta</h3>
+                    <div id="breakdown-content" class="p-3 bg-gray-800 rounded-lg text-sm text-gray-300 min-h-[60px]">
+                        // La estructura aparecerá aquí
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // --- ESTADO DEL JUEGO Y CONFIGURACIÓN ---
+    const state = {
+        unlockedLevels: [1],
+        completedLevels: []
+    };
+
+    const challenges = {
+        1: {
+            form: document.getElementById('form-1'),
+            inputs: [document.getElementById('input-1-user'), document.getElementById('input-1-pass')],
+            resultEl: document.getElementById('result-1'),
+            buildQuery: (vals) => `SELECT * FROM users WHERE username = '${vals[0]}' AND password = '${vals[1]}';`,
+            checkSuccess: (vals) => {
+                // Permitir variantes como: admin' OR '1'='1--
+                const pattern = /(('|\")?\s*or\s*('1'='1|1=1|true)(--)?)/i;
+                return pattern.test(vals[0]) || pattern.test(vals[1]);
+            },
+            analyze: (vals) => {
+                const injectionPattern = /'\s*or\s*('[^']*'='\d+'|\d+=\d+|true)/i;
+                const userInjection = vals[0].match(injectionPattern);
+                const passInjection = vals[1].match(injectionPattern);
+                const injection = userInjection || passInjection;
+                const comment = vals[0].includes('--') || vals[1].includes('--');
+                
+                if (injection) {
+                    const fieldName = userInjection ? 'usuario' : 'contraseña';
+                    let analysis = `<div class="space-y-2">
+                        <div class="text-red-400 font-bold">🔍 INYECCIÓN BOOLEANA DETECTADA</div>
+                        <div class="text-sm">La inyección <span class="sql-red font-mono">' OR 1=1'</span> en el campo ${fieldName} rompe la lógica de autenticación:</div>
+                        <div class="bg-gray-700 p-2 rounded text-xs font-mono">
+                            <div>Consulta original: WHERE username = '${vals[0]}' AND password = '${vals[1]}'</div>
+                            <div class="text-red-300">Resultado: La condición WHERE se vuelve TRUE porque '1=1' siempre es verdadero</div>
+                        </div>
+                        <div class="text-sm">Como <code>'1=1'</code> siempre es <span class="text-green-400">TRUE</span>, toda la condición WHERE es verdadera.</div>`;
+                    
+                    if (comment) {
+                        analysis += `<div class="text-sm">El comentario <span class="sql-gray font-mono">--</span> ignora el resto de la consulta, evitando errores de sintaxis.</div>`;
+                    }
+                    
+                    analysis += `</div>`;
+                    return analysis;
+                }
+                
+                if (vals[0].includes("'") || vals[1].includes("'")) {
+                    return '<div class="text-yellow-400">Se detectan comillas en la entrada. Esto podría ser el inicio de una inyección SQL. Intenta agregar una condición que siempre sea verdadera.</div>';
+                }
+                
+                return '<div class="text-gray-400">No se detectó una inyección booleana. El objetivo es hacer que la condición WHERE siempre sea verdadera usando <code>\' OR \'1\'=\'1</code>.</div>';
+            }
+        },
+        2: {
+            form: document.getElementById('form-2'),
+            inputs: [document.getElementById('input-2-search')],
+            resultEl: document.getElementById('result-2'),
+            buildQuery: (vals) => `SELECT name, description FROM products WHERE name LIKE '%${vals[0]}%';`,
+            checkSuccess: (vals) => vals[0].toLowerCase().includes("union select"),
+            analyze: (vals) => {
+                const injection = vals[0].match(/union\s+select\s+username,\s*password\s+from\s+users/i);
+                if (injection) {
+                    return `<div class="space-y-2">
+                        <div class="text-red-400 font-bold">🔍 ATAQUE UNION DETECTADO</div>
+                        <div class="text-sm">El ataque <span class="sql-red font-mono">UNION SELECT</span> permite combinar resultados de dos consultas:</div>
+                        <div class="bg-gray-700 p-2 rounded text-xs font-mono">
+                            <div>Consulta original: SELECT name, description FROM products WHERE name LIKE '%[input]%'</div>
+                            <div class="text-red-300">Consulta inyectada: SELECT name, description FROM products WHERE name LIKE '%' UNION SELECT username, password FROM users%'</div>
+                        </div>
+                        <div class="text-sm">Esto expone datos sensibles de la tabla <span class="sql-table font-mono">users</span>, mostrando nombres de usuario y contraseñas.</div>
+                        <div class="text-sm text-yellow-300">⚠️ En un ataque real, esto comprometería toda la base de datos de usuarios.</div>
+                    </div>`;
+                }
+                
+                if (vals[0].toLowerCase().includes("union")) {
+                    return '<div class="text-yellow-400">Se detectó la palabra clave UNION. Asegúrate de que el número de columnas coincida con la consulta original (2 columnas en este caso).</div>';
+                }
+                
+                if (vals[0].includes("'")) {
+                    return '<div class="text-yellow-400">Se detectan comillas. Para un ataque UNION, necesitas cerrar la cadena y luego añadir tu consulta SELECT.</div>';
+                }
+                
+                return '<div class="text-gray-400">No se detectó un ataque UNION. El objetivo es añadir una segunda consulta SELECT para extraer datos de la tabla <code>users</code>.</div>';
+            }
+        },
+        3: {
+            form: document.getElementById('form-3'),
+            inputs: [document.getElementById('input-3-coupon')],
+            resultEl: document.getElementById('result-3'),
+            buildQuery: (vals) => `SELECT discount FROM coupons WHERE code = '${vals[0]}';`,
+            checkSuccess: (vals) => {
+                const match = vals[0].match(/sleep\((\d+)\)/i);
+                return match && parseInt(match[1], 10) > 0;
+            },
+            analyze: (vals) => {
+                const injection = vals[0].match(/sleep\(\d+\)/i);
+                if (injection) {
+                    const seconds = injection[0].match(/\d+/)[0];
+                    return `<div class="space-y-2">
+                        <div class="text-red-400 font-bold">🔍 INYECCIÓN BASADA EN TIEMPO DETECTADA</div>
+                        <div class="text-sm">La función <span class="sql-red font-mono">SLEEP(${seconds})</span> ordena a la base de datos esperar ${seconds} segundos:</div>
+                        <div class="bg-gray-700 p-2 rounded text-xs font-mono">
+                            <div>Consulta original: SELECT discount FROM coupons WHERE code = '[input]'</div>
+                            <div class="text-red-300">Consulta inyectada: SELECT discount FROM coupons WHERE code = '' AND SLEEP(${seconds})--'</div>
+                        </div>
+                        <div class="text-sm">Si la página tarda ${seconds} segundos extra en cargar, has confirmado la vulnerabilidad.</div>
+                        <div class="text-sm text-yellow-300">⚠️ Este tipo de ataque es útil cuando no puedes ver errores o datos directamente.</div>
+                    </div>`;
+                }
+                return '<div class="text-gray-400">No se detectó una inyección basada en tiempo. El objetivo es inyectar una función que pause la ejecución de la base de datos, como <code>SLEEP(seconds)</code>.</div>';
+            }
+        }
+    };
+
+    // --- SIMULACIÓN DE LA BASE DE DATOS ---
+    const db = {
+        users: [
+            { id: 1, username: 'admin', password: 'ultra-secret-password-123' },
+            { id: 2, username: 'juan', password: 'password123' },
+            { id: 3, username: 'ana', password: 'qwerty' }
+        ],
+        products: [
+            { id: 1, name: 'Laptop Pro', description: 'Potente laptop para profesionales.' },
+            { id: 2, name: 'Teclado Mecánico RGB', description: 'Teclado con switches cherry-mx.' }
+        ]
+    };
+
+    // --- LÓGICA PRINCIPAL ---
+    document.addEventListener('DOMContentLoaded', () => {
+        updateUI();
+        Object.keys(challenges).forEach(key => {
+            const id = parseInt(key, 10);
+            const challenge = challenges[id];
+            
+            challenge.inputs.forEach(input => {
+                input.addEventListener('input', () => handleRealtimeUpdate(id));
+            });
+
+            challenge.form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                console.log(`Submit for challenge ${id}`); // Depuración
+                handleSubmit(id);
+            });
+        });
+    });
+
+    function handleRealtimeUpdate(id) {
+        if (!state.unlockedLevels.includes(id)) return;
+        const challenge = challenges[id];
+        const values = challenge.inputs.map(i => i.value);
+        const query = challenge.buildQuery(values);
+        displayQuery(query);
+
+        const analysis = challenge.analyze(values);
+        document.getElementById('analysis-content').innerHTML = analysis;
+    }
+
+    function handleSubmit(id) {
+        console.log(`Submit for challenge ${id}`); // Depuración
+        if (!state.unlockedLevels.includes(id)) return;
+        const challenge = challenges[id];
+        const values = challenge.inputs.map(i => i.value);
+        const isSuccess = challenge.checkSuccess(values);
+
+        switch(id) {
+            case 1:
+                handleLoginSubmit(isSuccess);
+                break;
+            case 2:
+                handleSearchSubmit(isSuccess, values[0]);
+                break;
+            case 3:
+                handleCouponSubmit(isSuccess, values[0]);
+                break;
+        }
+
+        if (isSuccess && !state.completedLevels.includes(id)) {
+            state.completedLevels.push(id);
+            const nextLevel = id + 1;
+            if (challenges[nextLevel] && !state.unlockedLevels.includes(nextLevel)) {
+                state.unlockedLevels.push(nextLevel);
+                showToast(`¡Felicidades! Has desbloqueado el Nivel ${nextLevel}.`);
+            }
+            updateUI();
+        }
+    }
+
+    // --- MANEJADORES DE RESULTADOS ---
+    function handleLoginSubmit(isSuccess) {
+        const resultEl = challenges[1].resultEl;
+        if (isSuccess) {
+            resultEl.innerHTML = `✅ ¡Acceso concedido! Has entrado como <strong>admin</strong>. La puerta al siguiente nivel está abierta.`;
+            resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+        } else {
+            resultEl.innerHTML = `❌ Acceso denegado. Usuario o contraseña incorrectos. ¡Sigue intentando!`;
+            resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
+        }
+    }
+
+    function handleSearchSubmit(isSuccess, searchTerm) {
+        const resultEl = challenges[2].resultEl;
+        resultEl.innerHTML = '';
+        if (isSuccess) {
+            resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm"><strong>¡PELIGRO!</strong> Se han extraído datos sensibles de la tabla de usuarios.</div>`;
+            db.users.forEach(user => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow';
+                itemEl.innerHTML = `<h4 class="font-bold text-red-400">${user.username}</h4><p class="text-sm text-red-400 font-fira">${user.password}</p>`;
+                resultEl.appendChild(itemEl);
+            });
+        } else {
+            const results = db.products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            if (results.length > 0) {
+                 results.forEach(item => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow';
+                    itemEl.innerHTML = `<h4 class="font-bold">${item.name}</h4><p class="text-sm text-gray-600 dark:text-gray-400">${item.description}</p>`;
+                    resultEl.appendChild(itemEl);
+                });
+            } else {
+                 resultEl.innerHTML = `<div class="p-3 text-center text-gray-500">No se encontraron productos.</div>`;
+            }
+        }
+    }
+    
+    function handleCouponSubmit(isSuccess, couponCode) {
+        const resultEl = challenges[3].resultEl;
+        const match = couponCode.match(/sleep\((\d+)\)/i);
+        const delay = isSuccess ? parseInt(match[1], 10) * 1000 : 0;
+
+        resultEl.innerHTML = `Validando cupón... <div class="w-4 h-4 border-2 border-dashed rounded-full animate-spin border-blue-500"></div>`;
+        resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-gray-100 dark:bg-gray-700 flex items-center gap-2';
+        
+        setTimeout(() => {
+            if (isSuccess) {
+                resultEl.innerHTML = `✅ ¡Éxito! El servidor tardó ${delay/1000} segundos en responder. Has confirmado una inyección a ciegas.`;
+                resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+            } else {
+                resultEl.innerHTML = `❌ El cupón no es válido y el servidor respondió instantáneamente. No se detectó retraso.`;
+                resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
+            }
+        }, delay);
+    }
+
+    // --- FUNCIONES DE UI ---
+    function updateUI() {
+        Object.keys(challenges).forEach(key => {
+            const id = parseInt(key, 10);
+            const card = document.getElementById(`challenge-${id}`);
+            if (state.unlockedLevels.includes(id)) {
+                card.classList.remove('locked');
+                card.style.pointerEvents = 'auto';
+            } else {
+                card.classList.add('locked');
+                card.style.pointerEvents = 'none';
+            }
+            if(state.completedLevels.includes(id)) {
+                card.classList.add('completed');
+                card.classList.remove('border-blue-500', 'border-gray-500');
+            }
+        });
+        
+        const progress = (state.completedLevels.length / Object.keys(challenges).length) * 100;
+        document.getElementById('progress-bar').style.width = `${progress}%`;
+        
+        const progressTextEl = document.getElementById('progress-text');
+        const totalLevels = Object.keys(challenges).length;
+        const completedCount = state.completedLevels.length;
+        
+        if (completedCount === 0) {
+            progressTextEl.textContent = `0% completado - ¡Comienza tu aventura!`;
+        } else if (completedCount === totalLevels) {
+            progressTextEl.textContent = `🎉 100% completado - ¡Eres un experto en SQLi!`;
+        } else {
+            progressTextEl.textContent = `${Math.round(progress)}% completado - Nivel ${completedCount} de ${totalLevels} completo`;
+        }
+    }
+
+    function displayQuery(query) {
+        let highlightedQuery = query;
+
+        // Separar comentarios primero
+        const commentMatch = query.match(/(--.*)$/);
+        let commentPart = '';
+        let queryPart = query;
+        if (commentMatch) {
+            commentPart = `<span class="sql-gray">${commentMatch[0]}</span>`;
+            queryPart = query.substring(0, query.indexOf(commentMatch[0]));
+        }
+
+        // Resaltar inyecciones, cadenas y palabras clave en la parte no comentada
+        const regex = /(' OR '1'='1|UNION\s+SELECT|SLEEP\(\d+\))|('[^']*')|(\bSELECT\b|\bFROM\b|\bWHERE\b|\bAND\b)/gi;
+        highlightedQuery = queryPart.replace(regex, (match, injection, string, keyword) => {
+            if (injection) return `<span class="sql-red">${injection}</span>`;
+            if (string) return `<span class="sql-green">${string}</span>`;
+            if (keyword) return `<span class="sql-blue">${keyword}</span>`;
+            return match;
+        }) + commentPart;
+
+        // Mostrar la consulta resaltada
+        document.getElementById('sql-query-display').innerHTML = highlightedQuery || '<span class="text-gray-300">// Esperando una interacción...</span>';
+
+        // Detectar vulnerabilidad (insensible a mayúsculas)
+        let detectedInjection = null;
+        const lowerQuery = query.toLowerCase();
+        if (lowerQuery.includes("' or '1'='1") || lowerQuery.includes("' or 1=1")) {
+            detectedInjection = { type: 'Inyección Booleana Clásica', danger: 'vuln-danger' };
+        } else if (lowerQuery.includes("union select")) {
+            detectedInjection = { type: 'Ataque UNION SELECT', danger: 'vuln-danger' };
+        } else if (lowerQuery.includes("sleep(")) {
+            detectedInjection = { type: 'Inyección Basada en Tiempo', danger: 'vuln-danger' };
+        }
+
+        const statusEl = document.getElementById('vulnerability-status');
+        const typeEl = document.getElementById('injection-type');
+        if (detectedInjection) {
+            statusEl.textContent = 'VULNERABLE';
+            statusEl.className = `vulnerability-indicator ${detectedInjection.danger}`;
+            typeEl.textContent = detectedInjection.type;
+        } else if (query.includes("'") || query.includes('"')) {
+            statusEl.textContent = 'SOSPECHOSA';
+            statusEl.className = 'vulnerability-indicator vuln-warning';
+            typeEl.textContent = 'Entrada con comillas detectada';
+        } else {
+            statusEl.textContent = 'SEGURA';
+            statusEl.className = 'vulnerability-indicator vuln-safe';
+            typeEl.textContent = '';
+        }
+
+        // Actualizar vista paso a paso
+        mostrarHTMLFormulario(query);
+        updateQueryBreakdown(query, detectedInjection);
+    }
+
+    function mostrarHTMLFormulario(query) {
+        // Detectar el tipo de consulta para mostrar el formulario adecuado
+        if (/FROM\s+users/i.test(query) && /username\s*=\s*'[^']*'/.test(query)) {
+            // Formulario de login
+            let userMatch = query.match(/username\s*=\s*'([^']*)'/i);
+            let passMatch = query.match(/password\s*=\s*'([^']*)'/i);
+            let user = userMatch ? userMatch[1] : '';
+            let pass = passMatch ? passMatch[1] : '';
+            let inyeccion = /(' OR '1'='1|UNION\s+SELECT|SLEEP\()/i.test(user);
+            let inyeccionPass = /(' OR '1'='1|UNION\s+SELECT|SLEEP\()/i.test(pass);
+            let userHtml = inyeccion ? `<span class='sql-red'>${user}</span>` : `<span class='sql-green'>${user}</span>`;
+            let passHtml = inyeccionPass ? `<span class='sql-red'>${pass}</span>` : `<span class='sql-green'>${pass}</span>`;
+            let html = `<form>\n  <input type=\"text\" name=\"username\" value=\"${userHtml}\" />\n  <input type=\"password\" name=\"password\" value=\"${passHtml}\" />\n  <button>Login</button>\n</form>`;
+            document.getElementById('sql-query-step').textContent = html || '// Esperando una interacción...';
+        } else if (/FROM\s+products/i.test(query) && /name LIKE '%[^%]*%'/i.test(query)) {
+            // Formulario de búsqueda
+            let searchMatch = query.match(/name LIKE '%([^%]*)%'/i);
+            let search = searchMatch ? searchMatch[1] : '';
+            let inyeccion = /(UNION\s+SELECT|SLEEP\()/i.test(search);
+            let searchHtml = inyeccion ? `<span class='sql-red'>${search}</span>` : `<span class='sql-green'>${search}</span>`;
+            let html = `<form>\n  <input type=\"text\" name=\"search\" value=\"${searchHtml}\" />\n  <button>Buscar</button>\n</form>`;
+            document.getElementById('sql-query-step').textContent = html || '// Esperando una interacción...';
+        } else if (/FROM\s+coupons/i.test(query) && /code\s*=\s*'[^']*'/.test(query)) {
+            // Formulario de cupón
+            let couponMatch = query.match(/code\s*=\s*'([^']*)'/i);
+            let coupon = couponMatch ? couponMatch[1] : '';
+            let inyeccion = /(SLEEP\()/i.test(coupon);
+            let couponHtml = inyeccion ? `<span class='sql-red'>${coupon}</span>` : `<span class='sql-green'>${coupon}</span>`;
+            let html = `<form>\n  <input type=\"text\" name=\"coupon\" value=\"${couponHtml}\" />\n  <button>Validar</button>\n</form>`;
+            document.getElementById('sql-query-step').textContent = html || '// Esperando una interacción...';
+        } else {
+            document.getElementById('sql-query-step').textContent = '// Esperando una interacción...';
+        }
+    }
+
+    function toggleHint(id) {
+        const hintEl = document.getElementById(`hint-${id}`);
+        if (hintEl) {
+            hintEl.classList.toggle('hidden');
+        }
+    }
+
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        
+        if (toastMessage) {
+            toastMessage.textContent = message;
+        } else {
+            toast.textContent = message;
+        }
+        toast.classList.add('show');
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+
+    function updateQueryBreakdown(query, detectedInjection) {
+        const breakdownEl = document.getElementById('breakdown-content');
+        const parts = {
+            select: query.match(/SELECT\s+([^FROM]+)/i)?.[1]?.trim() || '',
+            from: query.match(/FROM\s+(\w+)/i)?.[1] || '',
+            where: query.match(/WHERE\s+(.+?)(;|$)/i)?.[1]?.trim() || '',
+            injection: detectedInjection ? true : false
+        };
+        
+        let breakdown = '<div class="space-y-2 text-xs">';
+        
+        if (parts.select) {
+            breakdown += `<div><span class="text-blue-400 font-bold">SELECT:</span> <span class="text-gray-300">${parts.select}</span></div>`;
+        }
+        
+        if (parts.from) {
+            breakdown += `<div><span class="text-green-400 font-bold">FROM:</span> <span class="text-cyan-300">${parts.from}</span></div>`;
+        }
+        
+        if (parts.where) {
+            breakdown += `<div><span class="text-yellow-400 font-bold">WHERE:</span> <span class="text-gray-300">${parts.where}</span></div>`;
+            
+            if (detectedInjection) {
+                breakdown += '<div class="mt-2 p-2 bg-red-900/30 rounded border border-red-500">';
+                breakdown += '<div class="text-red-400 font-bold text-xs mb-1">⚠️ INYECCIÓN DETECTADA:</div>';
+                switch(detectedInjection.type) {
+                    case 'Inyección Booleana Clásica':
+                        breakdown += '<div class="text-red-300 text-xs">La condición <code>OR \'1=1\'</code> siempre es verdadera, saltándose la autenticación.</div>';
+                        break;
+                    case 'Ataque UNION SELECT':
+                        breakdown += '<div class="text-red-300 text-xs">El <code>UNION SELECT</code> combina resultados de otra tabla, exponiendo datos sensibles.</div>';
+                        break;
+                    case 'Inyección Basada en Tiempo':
+                        breakdown += '<div class="text-red-300 text-xs">La función <code>SLEEP()</code> causa un retraso, confirmando la vulnerabilidad.</div>';
+                        break;
+                }
+                breakdown += '</div>';
+            }
+        }
+        
+        if (!detectedInjection && (query.includes("'") || query.includes('"'))) {
+            breakdown += '<div class="mt-2 p-2 bg-yellow-900/30 rounded border border-yellow-500">';
+            breakdown += '<div class="text-yellow-400 font-bold text-xs mb-1">⚠️ PRECAUCIÓN:</div>';
+            breakdown += '<div class="text-yellow-300 text-xs">Se detectan comillas en la entrada. Usar parámetros preparados previene inyecciones.</div>';
+            breakdown += '</div>';
+        }
+        
+        breakdown += '</div>';
+        breakdownEl.innerHTML = breakdown;
+    }
+
+    </script>
+</body>
+</html>
