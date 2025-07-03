@@ -421,38 +421,44 @@
             resultEl: document.getElementById('result-1'),
             buildQuery: (vals) => `SELECT * FROM users WHERE username = '${vals[0]}' AND password = '${vals[1]}';`,
             checkSuccess: (values, query, dbResult) => {
-                // Éxito si la inyección booleana es correcta Y la consulta devuelve al menos un usuario (el admin)
-                const pattern = /(('|\")?\s*or\s*('1'='1|1=1|true)(--)?)/i;
-                const isInjectionAttempt = pattern.test(values[0]) || pattern.test(values[1]);
+                const injectionPattern = /(('|\")?\s*or\s*('1'='1|1=1|true)(--)?)/i;
+                const isInjectionAttempt = injectionPattern.test(values[0]) || injectionPattern.test(values[1]);
+                const usernameInput = values[0];
+                const passwordInput = values[1];
 
-                if (isInjectionAttempt && dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
-                    // Verifica si el usuario 'admin' está en los resultados devueltos por la inyección
-                    return dbResult.data[0].values.some(row => row[1] === 'admin');
-                }
-                // También permitir el login normal si las credenciales son correctas (aunque no es el objetivo del desafío)
                 if (dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
-                     return dbResult.data[0].values.some(row => row[1] === values[0] && row[2] === values[1]);
-                }
-                return false;
-            },
-            displayResult: function(isSuccess, dbResult, values) {
-                if (isSuccess) {
-                    this.resultEl.innerHTML = `✅ ¡Acceso concedido! Has entrado como <strong>admin</strong>. La puerta al siguiente nivel está abierta.`;
-                    this.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
-                } else {
-                    let errorMsg = "❌ Acceso denegado.";
-                    if (dbResult && dbResult.error) {
-                        errorMsg += `<br><small class="text-red-400">Error DB: ${dbResult.error}</small>`;
-                    } else if (dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length === 0) {
-                         errorMsg += " Usuario o contraseña incorrectos.";
-                    } else {
-                        errorMsg += " ¡Sigue intentando!";
+                    const loggedInUserRow = dbResult.data[0].values.find(row => row[1] === 'admin'); // Suponiendo que la columna 1 es username
+
+                    if (loggedInUserRow) { // Se encontró al usuario admin en los resultados
+                        if (isInjectionAttempt) {
+                            return { status: 'INJECTION_SUCCESS', message: '¡Inyección exitosa! Acceso como admin concedido.' };
+                        } else if (usernameInput === 'admin' && passwordInput === loggedInUserRow[2]) { // Suponiendo que la columna 2 es password
+                            return { status: 'VALID_LOGIN', message: 'Login con credenciales válidas como admin. ¡Intenta con inyección para avanzar!' };
+                        }
                     }
-                    this.resultEl.innerHTML = errorMsg;
+                    // Si no es admin, pero es otro usuario válido (ej. 'juan')
+                    const otherUserRow = dbResult.data[0].values.find(row => row[1] === usernameInput && row[2] === passwordInput);
+                    if (otherUserRow && !isInjectionAttempt) {
+                         return { status: 'VALID_LOGIN_OTHER_USER', message: `Login exitoso como ${usernameInput}. Para este desafío, necesitas acceder como 'admin' usando una inyección.` };
+                    }
+                }
+
+                if (dbResult && !dbResult.success && dbResult.error) {
+                    return { status: 'DB_ERROR', message: `Error DB: ${dbResult.error}` };
+                }
+                return { status: 'FAILED', message: 'Acceso denegado. Usuario o contraseña incorrectos, o la inyección no tuvo el efecto esperado.' };
+            },
+            displayResult: function(checkSuccessResult, dbResult, values) { // Ahora recibe el objeto de checkSuccessResult
+                this.resultEl.innerHTML = checkSuccessResult.message;
+                if (checkSuccessResult.status === 'INJECTION_SUCCESS') {
+                    this.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+                } else if (checkSuccessResult.status === 'VALID_LOGIN' || checkSuccessResult.status === 'VALID_LOGIN_OTHER_USER') {
+                    this.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200';
+                } else { // FAILED o DB_ERROR
                     this.resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
                 }
             },
-            analyze: (vals, query) => { // `query` no se usa aquí pero se mantiene la firma
+            analyze: (vals, query) => {
                 const injectionPattern = /'\s*or\s*('[^']*'='\d+'|\d+=\d+|true)/i;
                 const userInjection = vals[0].match(injectionPattern);
                 const passInjection = vals[1].match(injectionPattern);
@@ -491,33 +497,30 @@
             resultEl: document.getElementById('result-2'),
             buildQuery: (vals) => `SELECT name, description FROM products WHERE name LIKE '%${vals[0]}%';`,
             checkSuccess: (values, query, dbResult) => {
-                // Éxito si la query incluye "UNION SELECT" y devuelve datos que parecen ser de usuarios (ej. 2 columnas)
-                // y al menos una de las columnas devueltas es 'username' o 'password' (simulado, ya que no podemos saber los nombres exactos de las columnas inyectadas)
-                const isUnionAttempt = values[0].toLowerCase().includes("union select");
-                if (isUnionAttempt && dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
-                    const columns = dbResult.data[0].columns;
-                    // Suponemos que la inyección exitosa de 'users' resultará en columnas como 'username', 'password'
-                    // Esto es una simplificación. En un caso real, la estructura de 'users' podría variar.
-                    // Aquí, simplemente verificamos que se devuelvan más de 0 filas de la tabla 'users' (o una tabla con estructura similar)
-                    // y que la consulta original no devuelva resultados de 'products' para asegurar que es la inyección.
+                const isUnionFromUsersAttempt = /union\s+select\s+[^,]+,\s*[^,]+\s+from\s+users/i.test(query);
+
+                if (isUnionFromUsersAttempt && dbResult && dbResult.success && dbResult.data.length > 0 && dbResult.data[0].values.length > 0) {
+                    // Si la consulta UNION SELECT ... FROM users fue exitosa y devolvió datos, es un éxito.
+                    // El número de columnas debe coincidir para que SQLite no de error, lo cual está implícito en dbResult.success.
+                    // Adicionalmente, nos aseguramos que la parte original de la query no produzca estos mismos resultados.
                     const originalQueryPart = query.split(/UNION/i)[0];
-                    let originalResults = [];
+                    let originalResultsCount = 0;
                     try {
-                        originalResults = state.dbInstances[2].exec(originalQueryPart)[0]?.values || [];
+                        const originalExecResult = state.dbInstances[2].exec(originalQueryPart);
+                        if (originalExecResult.length > 0 && originalExecResult[0].values) {
+                            originalResultsCount = originalExecResult[0].values.length;
+                        }
                     } catch(e) {/*ignorar error si la primera parte falla por la inyeccion*/}
 
-                    // Éxito si la inyección UNION devuelve filas y la parte original no devuelve nada (o menos filas que la inyección)
-                    // y la inyección contiene username y password
-                    const injectionPattern = /union\s+select\s+[^,]+,\s*[^,]+\s+from\s+users/i;
-                    if (injectionPattern.test(query) && dbResult.data[0].values.length > 0 && originalResults.length === 0) {
-                        // Comprobar si las columnas extraídas son de la tabla users
-                        const userColumns = ['username', 'password', 'email']; // Columnas esperadas de la tabla users
-                        const resultColumns = dbResult.data[0].columns.map(c => c.toLowerCase());
-                        // Si la inyección es "SELECT username, password FROM users", las columnas devueltas serán "username" y "password"
-                        // Si es "SELECT email, password FROM users", serán "email" y "password", etc.
-                        // La consulta original devuelve "name", "description"
-                        // Si las columnas devueltas NO son "name" y "description", es probable que sea la inyección.
-                        return !(resultColumns.includes('name') && resultColumns.includes('description'));
+                    // Si la query original no devolvió nada, o devolvió menos filas que la query completa con UNION,
+                    // y la query completa devolvió filas, es probable que la inyección sea la fuente de los datos.
+                    if (dbResult.data[0].values.length > originalResultsCount) {
+                        return true;
+                    }
+                    // Caso especial: si la query original devuelve algo, pero la inyección añade más filas de users.
+                    // O si la query original da error (originalResultsCount = 0) y la inyección funciona.
+                    if (originalResultsCount === 0 && dbResult.data[0].values.length > 0){
+                        return true;
                     }
                 }
                 return false;
@@ -900,13 +903,31 @@
         }
 
         // `checkSuccess` ahora puede tomar la query original, los valores, Y el resultado de la DB.
-        const isSuccess = challenge.checkSuccess(values, query, resultFromDB);
+        const challengeOutcome = challenge.checkSuccess(values, query, resultFromDB);
 
         // Actualizar UI con resultados
-        challenge.displayResult(isSuccess, resultFromDB, values);
+        // Para el desafío 1, displayResult ahora toma challengeOutcome directamente.
+        // Para otros desafíos, se asume que displayResult todavía espera un booleano isSuccess y dbResult.
+        if (id === 1) {
+            challenge.displayResult(challengeOutcome, resultFromDB, values);
+        } else {
+            // Para los otros desafíos, mantenemos la lógica anterior hasta que se refactoricen.
+            // challengeOutcome aquí sería el booleano de la antigua función checkSuccess.
+            challenge.displayResult(challengeOutcome, resultFromDB, values);
+        }
 
+        // Determinar si se avanza de nivel
+        let allowLevelAdvance = false;
+        if (id === 1) {
+            allowLevelAdvance = challengeOutcome.status === 'INJECTION_SUCCESS';
+        } else if (id === 3) { // Desafío de tiempo
+            allowLevelAdvance = isSuccessBasedOnInjection || challengeOutcome; // challengeOutcome es el booleano de checkSuccess
+        }
+         else { // Para otros desafíos (2, 4, 5, 6)
+            allowLevelAdvance = challengeOutcome; // challengeOutcome es el booleano de checkSuccess
+        }
 
-        if ((isSuccess || isSuccessBasedOnInjection) && !state.completedLevels.includes(id)) {
+        if (allowLevelAdvance && !state.completedLevels.includes(id)) {
             state.completedLevels.push(id);
             const nextLevel = id + 1;
             if (challenges[nextLevel] && !state.unlockedLevels.includes(nextLevel)) {
