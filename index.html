@@ -56,6 +56,32 @@
             border-radius: 6px;
             border-left: 4px solid #569cd6;
         }
+        .meta-query {
+            background: linear-gradient(135deg, rgba(255, 100, 100, 0.1), rgba(255, 150, 150, 0.05));
+            border: 1px solid rgba(255, 100, 100, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+        }
+        .meta-query p {
+            margin: 4px 0;
+            font-size: 0.9em;
+        }
+        .complex-query {
+            background: linear-gradient(135deg, rgba(150, 100, 255, 0.1), rgba(200, 150, 255, 0.05));
+            border: 1px solid rgba(150, 100, 255, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+        }
+        .complex-query p {
+            margin: 4px 0;
+            font-size: 0.9em;
+        }
+        .analysis-responsive {
+            transition: all 0.3s ease;
+            resize: vertical;
+        }
         .vulnerability-indicator {
             display: inline-block;
             padding: 2px 6px;
@@ -172,6 +198,72 @@
                     </div>
                 </div>
 
+                <!-- Desafío 4: Inyección basada en errores -->
+                <div id="challenge-4" class="challenge-card locked bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">Nivel 4: ¡Provoca un Error!</h3>
+                        <span class="text-xs font-medium mr-2 px-2.5 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">Error-Based</span>
+                    </div>
+                    <div class="challenge-content">
+                        <p class="mt-2 text-gray-600 dark:text-gray-400">
+                            El sistema muestra mensajes de error de la base de datos. Intenta provocar un error para revelar información sensible usando una inyección en el campo de búsqueda.
+                        </p>
+                        <form id="form-4" class="flex gap-2 mt-4">
+                            <input type="text" id="input-4-search" placeholder="Buscar producto..." class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-gray-50 dark:bg-gray-700 font-fira p-2">
+                            <button type="submit" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-md hover:bg-purple-700">Buscar</button>
+                        </form>
+                        <div class="mt-2 text-right"><button onclick="toggleHint(4)" class="text-sm text-purple-500 hover:underline">Necesito una pista</button></div>
+                        <p id="hint-4" class="hidden mt-2 p-2 bg-purple-50 dark:bg-purple-900/20 text-sm rounded">
+                            Los errores de MySQL a menudo revelan información valiosa. Intenta usar <code class="font-fira">information_schema</code> con una subconsulta que fuerce un error. Las funciones como <code class="font-fira">FLOOR(RAND()*2)</code> y <code class="font-fira">COUNT(*)</code> pueden ayudar.
+                        </p>
+                        <div id="result-4" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
+                    </div>
+                </div>
+
+                <!-- Desafío 5: Inyección en ORDER BY/LIMIT -->
+                <div id="challenge-5" class="challenge-card locked bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-pink-500">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">Nivel 5: Manipula el Orden</h3>
+                        <span class="text-xs font-medium mr-2 px-2.5 py-0.5 rounded bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300">ORDER BY/LIMIT</span>
+                    </div>
+                    <div class="challenge-content">
+                        <p class="mt-2 text-gray-600 dark:text-gray-400">
+                            El sistema permite ordenar los resultados. Intenta manipular el parámetro de orden para provocar un error o filtrar información.
+                        </p>
+                        <form id="form-5" class="flex gap-2 mt-4">
+                            <input type="text" id="input-5-order" placeholder="Campo para ordenar (por ejemplo: name)" class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-gray-50 dark:bg-gray-700 font-fira p-2">
+                            <button type="submit" class="bg-pink-600 text-white font-bold py-2 px-4 rounded-md hover:bg-pink-700">Ordenar</button>
+                        </form>
+                        <div class="mt-2 text-right"><button onclick="toggleHint(5)" class="text-sm text-pink-500 hover:underline">Necesito una pista</button></div>
+                        <p id="hint-5" class="hidden mt-2 p-2 bg-pink-50 dark:bg-pink-900/20 text-sm rounded">
+                            El campo ORDER BY normalmente acepta nombres de columnas como 'name' o 'id'. ¿Qué pasaría si intentas inyectar SQL después de un punto y coma <code class="font-fira">;</code> o usar subconsultas con <code class="font-fira">UNION SELECT</code>?
+                        </p>
+                        <div id="result-5" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
+                    </div>
+                </div>
+
+                <!-- Desafío 6: Inyección en Subconsulta -->
+                <div id="challenge-6" class="challenge-card locked bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-indigo-500">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xl font-bold">Nivel 6: Subconsulta Maliciosa</h3>
+                        <span class="text-xs font-medium mr-2 px-2.5 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">Subconsulta</span>
+                    </div>
+                    <div class="challenge-content">
+                        <p class="mt-2 text-gray-600 dark:text-gray-400">
+                            El sistema usa subconsultas para validar datos. Intenta inyectar una subconsulta para filtrar información sensible.
+                        </p>
+                        <form id="form-6" class="flex gap-2 mt-4">
+                            <input type="text" id="input-6-check" placeholder="Introduce un valor..." class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm bg-gray-50 dark:bg-gray-700 font-fira p-2">
+                            <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700">Validar</button>
+                        </form>
+                        <div class="mt-2 text-right"><button onclick="toggleHint(6)" class="text-sm text-indigo-500 hover:underline">Necesito una pista</button></div>
+                        <p id="hint-6" class="hidden mt-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 text-sm rounded">
+                            Las subconsultas pueden devolver TRUE o FALSE. Si puedes hacer que una subconsulta con <code class="font-fira">SELECT COUNT(*)</code> devuelva un número mayor que 0, podrías saltarte la validación. Piensa en condiciones que siempre sean verdaderas.
+                        </p>
+                        <div id="result-6" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- Panel Derecho: Vista del Servidor -->
@@ -202,7 +294,7 @@
                 <!-- Análisis detallado -->
                 <div id="analysis-box" class="mt-4">
                      <h3 class="font-semibold text-gray-300 mb-2">🔬 Análisis del Payload</h3>
-                     <div id="analysis-content" class="p-3 bg-gray-800 rounded-lg text-sm text-gray-300 min-h-[80px] overflow-y-auto max-h-[200px]">
+                     <div id="analysis-content" class="p-3 bg-gray-800 rounded-lg text-sm text-gray-300 min-h-[80px] overflow-y-auto analysis-responsive" style="max-height: none;">
                         💡 Escribe en un campo para ver el análisis en tiempo real.
                      </div>
                 </div>
@@ -327,6 +419,75 @@
                 }
                 return '<div class="text-gray-400">No se detectó una inyección basada en tiempo. El objetivo es inyectar una función que pause la ejecución de la base de datos, como <code>SLEEP(seconds)</code>.</div>';
             }
+        },
+        4: {
+            form: document.getElementById('form-4'),
+            inputs: [document.getElementById('input-4-search')],
+            resultEl: document.getElementById('result-4'),
+            buildQuery: (vals) => `SELECT name, description FROM products WHERE name LIKE '%${vals[0]}%';`,
+            checkSuccess: (vals) => /information_schema/i.test(vals[0]) && /(select|floor|rand|count)/i.test(vals[0]),
+            analyze: (vals) => {
+                if (/information_schema/i.test(vals[0]) && /(select|floor|rand|count)/i.test(vals[0])) {
+                    return `<div class="space-y-2">
+                        <div class="text-purple-400 font-bold">🔍 INYECCIÓN BASADA EN ERRORES DETECTADA</div>
+                        <div class="text-sm">Has usado <span class="sql-red font-mono">information_schema</span> junto con funciones que pueden provocar errores controlados.</div>
+                        <div class="bg-gray-700 p-2 rounded text-xs font-mono">
+                            <div>Payload: ${vals[0]}</div>
+                        </div>
+                        <div class="text-sm text-yellow-300">⚠️ Los errores de MySQL pueden revelar nombres de bases de datos, tablas y otra información sensible.</div>
+                    </div>`;
+                }
+                if (/information_schema/i.test(vals[0])) {
+                    return '<div class="text-yellow-400">Detectado <code>information_schema</code>. Necesitas añadir funciones que provoquen errores como <code>FLOOR(RAND()*2)</code> y <code>COUNT(*)</code>.</div>';
+                }
+                return '<div class="text-gray-400">El objetivo es provocar un error de MySQL que revele información. Usa <code>information_schema</code> con subconsultas que generen duplicados.</div>';
+            }
+        },
+        5: {
+            form: document.getElementById('form-5'),
+            inputs: [document.getElementById('input-5-order')],
+            resultEl: document.getElementById('result-5'),
+            buildQuery: (vals) => `SELECT name, description FROM products ORDER BY ${vals[0]};`,
+            checkSuccess: (vals) => /(select.*from.*users|;.*select|\(.*select.*union)/i.test(vals[0]),
+            analyze: (vals) => {
+                if (/(select.*from.*users|;.*select|\(.*select.*union)/i.test(vals[0])) {
+                    return `<div class="space-y-2">
+                        <div class="text-pink-400 font-bold">🔍 INYECCIÓN EN ORDER BY DETECTADA</div>
+                        <div class="text-sm">Has inyectado SQL en el parámetro ORDER BY para ejecutar consultas adicionales o provocar errores.</div>
+                        <div class="bg-gray-700 p-2 rounded text-xs font-mono">
+                            <div>ORDER BY ${vals[0]}</div>
+                        </div>
+                        <div class="text-sm text-yellow-300">⚠️ En sistemas reales, esto puede permitir la extracción de datos o ejecución de comandos arbitrarios.</div>
+                    </div>`;
+                }
+                if (/;|union|select/i.test(vals[0])) {
+                    return '<div class="text-yellow-400">Detectadas palabras clave SQL. Intenta combinarlas para crear una inyección más compleja que extraiga datos de la tabla users.</div>';
+                }
+                return '<div class="text-gray-400">El parámetro ORDER BY puede ser vulnerable. Intenta inyectar SQL usando <code>;</code> seguido de consultas o subconsultas con <code>UNION SELECT</code>.</div>';
+            }
+        },
+        6: {
+            form: document.getElementById('form-6'),
+            inputs: [document.getElementById('input-6-check')],
+            resultEl: document.getElementById('result-6'),
+            buildQuery: (vals) => `SELECT * FROM users WHERE username = '${vals[0]}' OR (SELECT COUNT(*) FROM users WHERE username = '${vals[0]}') > 0;`,
+            checkSuccess: (vals) => /(select.*count.*from.*users|where.*username.*and.*password)/i.test(vals[0]),
+            analyze: (vals) => {
+                if (/(select.*count.*from.*users|where.*username.*and.*password)/i.test(vals[0])) {
+                    return `<div class="space-y-2">
+                        <div class="text-indigo-400 font-bold">🔍 INYECCIÓN EN SUBCONSULTA DETECTADA</div>
+                        <div class="text-sm">Has inyectado una subconsulta que puede saltarse la validación del sistema.</div>
+                        <div class="bg-gray-700 p-2 rounded text-xs font-mono">
+                            <div>Subconsulta: ${vals[0]}</div>
+                        </div>
+                        <div class="text-sm text-yellow-300">⚠️ Las subconsultas maliciosas pueden forzar condiciones TRUE y obtener acceso no autorizado.</div>
+                    </div>`;
+                }
+                if (/select.*count/i.test(vals[0])) {
+                    return '<div class="text-yellow-400">Detectado <code>SELECT COUNT</code>. Intenta añadir condiciones <code>WHERE</code> que siempre sean verdaderas para forzar el resultado.</div>';
+                }
+                return '<div class="text-gray-400">El objetivo es inyectar una subconsulta que devuelva TRUE. Usa <code>SELECT COUNT(*) FROM users WHERE</code> con condiciones siempre verdaderas.</div>';
+            }
         }
     };
 
@@ -371,6 +532,33 @@
 
         const analysis = challenge.analyze(values);
         document.getElementById('analysis-content').innerHTML = analysis;
+        
+        // Ajustar altura dinámicamente
+        adjustAnalysisPanelHeight();
+    }
+
+    function adjustAnalysisPanelHeight() {
+        const analysisContent = document.getElementById('analysis-content');
+        if (analysisContent) {
+            // Resetear altura para obtener el scroll height natural
+            analysisContent.style.maxHeight = 'none';
+            analysisContent.style.height = 'auto';
+            
+            // Obtener la altura del contenido
+            const scrollHeight = analysisContent.scrollHeight;
+            const currentHeight = analysisContent.clientHeight;
+            
+            // Si el contenido es muy largo, establecer un máximo razonable
+            if (scrollHeight > 400) {
+                analysisContent.style.maxHeight = '400px';
+                analysisContent.style.overflowY = 'auto';
+            } else {
+                // Si es contenido corto, permitir que se expanda naturalmente
+                analysisContent.style.maxHeight = 'none';
+                analysisContent.style.overflowY = 'visible';
+                analysisContent.style.height = `${Math.max(scrollHeight, 80)}px`;
+            }
+        }
     }
 
     function handleSubmit(id) {
@@ -389,6 +577,15 @@
                 break;
             case 3:
                 handleCouponSubmit(isSuccess, values[0]);
+                break;
+            case 4:
+                handleErrorSubmit(isSuccess, values[0]);
+                break;
+            case 5:
+                handleOrderSubmit(isSuccess, values[0]);
+                break;
+            case 6:
+                handleSubquerySubmit(isSuccess, values[0]);
                 break;
         }
 
@@ -458,6 +655,73 @@
                 resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
             }
         }, delay);
+    }
+
+    function handleErrorSubmit(isSuccess, searchTerm) {
+        const resultEl = challenges[4].resultEl;
+        resultEl.innerHTML = '';
+        if (isSuccess) {
+            // Simular error de MySQL que revela información
+            resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm">
+                <strong>ERROR MySQL:</strong> Duplicate entry 'shopdb:1' for key 'group_key'<br>
+                <span class="text-xs">Query: SELECT name, description FROM products WHERE name LIKE '%${searchTerm}%'</span>
+            </div>
+            <div class="mt-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 text-sm">
+                ✅ <strong>¡Éxito!</strong> El error reveló que la base de datos se llama <strong>"shopdb"</strong>. En un ataque real, podrías extraer más información sensible.
+            </div>`;
+        } else {
+            const results = db.products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            if (results.length > 0) {
+                results.forEach(item => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow';
+                    itemEl.innerHTML = `<h4 class="font-bold">${item.name}</h4><p class="text-sm text-gray-600 dark:text-gray-400">${item.description}</p>`;
+                    resultEl.appendChild(itemEl);
+                });
+            } else {
+                resultEl.innerHTML = `<div class="p-3 text-center text-gray-500">No se encontraron productos.</div>`;
+            }
+        }
+    }
+
+    function handleOrderSubmit(isSuccess, orderField) {
+        const resultEl = challenges[5].resultEl;
+        resultEl.innerHTML = '';
+        if (isSuccess) {
+            resultEl.innerHTML = `<div class="p-3 rounded-md bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 text-sm">
+                <strong>ERROR MySQL:</strong> You have an error in your SQL syntax near '${orderField}' at line 1<br>
+                <span class="text-xs">Query: SELECT name, description FROM products ORDER BY ${orderField}</span>
+            </div>
+            <div class="mt-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 text-sm">
+                ✅ <strong>¡Éxito!</strong> Has manipulado el ORDER BY y provocado un error. En un sistema real, podrías usar esto para extraer datos o ejecutar comandos adicionales.
+            </div>`;
+        } else {
+            // Mostrar productos ordenados normalmente
+            let sortedProducts = [...db.products];
+            if (orderField.toLowerCase() === 'name') {
+                sortedProducts.sort((a, b) => a.name.localeCompare(b.name));
+            } else if (orderField.toLowerCase() === 'description') {
+                sortedProducts.sort((a, b) => a.description.localeCompare(b.description));
+            }
+            
+            sortedProducts.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg shadow';
+                itemEl.innerHTML = `<h4 class="font-bold">${item.name}</h4><p class="text-sm text-gray-600 dark:text-gray-400">${item.description}</p>`;
+                resultEl.appendChild(itemEl);
+            });
+        }
+    }
+
+    function handleSubquerySubmit(isSuccess, checkValue) {
+        const resultEl = challenges[6].resultEl;
+        if (isSuccess) {
+            resultEl.innerHTML = `✅ <strong>¡Acceso concedido!</strong> La subconsulta maliciosa devolvió TRUE, saltándose la validación del sistema.`;
+            resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+        } else {
+            resultEl.innerHTML = `❌ Valor no válido. El sistema no pudo encontrar coincidencias para "${checkValue}".`;
+            resultEl.className = 'mt-4 p-3 rounded-md text-sm min-h-[50px] bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
+        }
     }
 
     // --- FUNCIONES DE UI ---
@@ -548,12 +812,17 @@
         // Actualizar vista paso a paso
         mostrarHTMLFormulario(query);
         updateQueryBreakdown(query, detectedInjection);
+        
+        // Ajustar altura del panel de análisis si existe contenido
+        setTimeout(adjustAnalysisPanelHeight, 100);
     }
 
     function mostrarHTMLFormulario(query) {
+        const stepEl = document.getElementById('sql-query-step');
+        
         // Detectar el tipo de consulta para mostrar el formulario adecuado
         if (/FROM\s+users/i.test(query) && /username\s*=\s*'[^']*'/.test(query)) {
-            // Formulario de login
+            // Formulario de login (Retos 1-2)
             let userMatch = query.match(/username\s*=\s*'([^']*)'/i);
             let passMatch = query.match(/password\s*=\s*'([^']*)'/i);
             let user = userMatch ? userMatch[1] : '';
@@ -562,26 +831,70 @@
             let inyeccionPass = /(' OR '1'='1|UNION\s+SELECT|SLEEP\()/i.test(pass);
             let userHtml = inyeccion ? `<span class='sql-red'>${user}</span>` : `<span class='sql-green'>${user}</span>`;
             let passHtml = inyeccionPass ? `<span class='sql-red'>${pass}</span>` : `<span class='sql-green'>${pass}</span>`;
-            let html = `<form>\n  <input type=\"text\" name=\"username\" value=\"${userHtml}\" />\n  <input type=\"password\" name=\"password\" value=\"${passHtml}\" />\n  <button>Login</button>\n</form>`;
-            document.getElementById('sql-query-step').textContent = html || '// Esperando una interacción...';
-        } else if (/FROM\s+products/i.test(query) && /name LIKE '%[^%]*%'/i.test(query)) {
-            // Formulario de búsqueda
+            let html = `<form>\n  <input type="text" name="username" value="${userHtml}" />\n  <input type="password" name="password" value="${passHtml}" />\n  <button>Login</button>\n</form>`;
+            stepEl.textContent = html;
+        } else if (/FROM\s+products/i.test(query) && (/name LIKE '%[^%]*%'/i.test(query) || /ORDER BY/i.test(query))) {
+            // Formulario de búsqueda de productos (Retos 2-5)
             let searchMatch = query.match(/name LIKE '%([^%]*)%'/i);
+            let orderMatch = query.match(/ORDER BY\s+([^LIMIT;]+)/i);
+            let limitMatch = query.match(/LIMIT\s+([^;]+)/i);
+            
             let search = searchMatch ? searchMatch[1] : '';
-            let inyeccion = /(UNION\s+SELECT|SLEEP\()/i.test(search);
-            let searchHtml = inyeccion ? `<span class='sql-red'>${search}</span>` : `<span class='sql-green'>${search}</span>`;
-            let html = `<form>\n  <input type=\"text\" name=\"search\" value=\"${searchHtml}\" />\n  <button>Buscar</button>\n</form>`;
-            document.getElementById('sql-query-step').textContent = html || '// Esperando una interacción...';
+            let orderBy = orderMatch ? orderMatch[1].trim() : '';
+            let limit = limitMatch ? limitMatch[1].trim() : '';
+            
+            // Detectar inyecciones
+            let searchInjection = /(UNION\s+SELECT|SLEEP\(|information_schema)/i.test(search);
+            let orderInjection = /(SLEEP\(|information_schema|UNION|SELECT)/i.test(orderBy);
+            let limitInjection = /(SLEEP\(|UNION|SELECT)/i.test(limit);
+            
+            let searchHtml = searchInjection ? `<span class='sql-red'>${search}</span>` : `<span class='sql-green'>${search}</span>`;
+            let orderHtml = orderInjection ? `<span class='sql-red'>${orderBy}</span>` : `<span class='sql-green'>${orderBy}</span>`;
+            let limitHtml = limitInjection ? `<span class='sql-red'>${limit}</span>` : `<span class='sql-green'>${limit}</span>`;
+            
+            let html = `<form>\n  <input type="text" name="search" value="${searchHtml}" placeholder="Buscar producto..." />`;
+            if (orderBy) html += `\n  <input type="hidden" name="sort" value="${orderHtml}" />`;
+            if (limit) html += `\n  <input type="hidden" name="limit" value="${limitHtml}" />`;
+            html += `\n  <button>Buscar</button>\n</form>`;
+            stepEl.textContent = html;
         } else if (/FROM\s+coupons/i.test(query) && /code\s*=\s*'[^']*'/.test(query)) {
-            // Formulario de cupón
+            // Formulario de cupón (Reto 3)
             let couponMatch = query.match(/code\s*=\s*'([^']*)'/i);
             let coupon = couponMatch ? couponMatch[1] : '';
             let inyeccion = /(SLEEP\()/i.test(coupon);
             let couponHtml = inyeccion ? `<span class='sql-red'>${coupon}</span>` : `<span class='sql-green'>${coupon}</span>`;
-            let html = `<form>\n  <input type=\"text\" name=\"coupon\" value=\"${couponHtml}\" />\n  <button>Validar</button>\n</form>`;
-            document.getElementById('sql-query-step').textContent = html || '// Esperando una interacción...';
+            let html = `<form>\n  <input type="text" name="coupon" value="${couponHtml}" />\n  <button>Validar</button>\n</form>`;
+            stepEl.textContent = html;
+        } else if (/FROM\s+information_schema/i.test(query)) {
+            // Consulta de metadatos (Reto 4-6)
+            let tableMatch = query.match(/FROM\s+(information_schema\.\w+)/i);
+            let whereMatch = query.match(/WHERE\s+(.+?)(?:ORDER BY|LIMIT|;|$)/i);
+            
+            let table = tableMatch ? tableMatch[1] : '';
+            let whereClause = whereMatch ? whereMatch[1].trim() : '';
+            
+            let tableHtml = `<span class='sql-red'>${table}</span>`;
+            let whereHtml = whereClause ? `<span class='sql-red'>${whereClause}</span>` : '';
+            
+            let html = `<div class="meta-query">\n  <p>🔍 Consulta de metadatos detectada:</p>\n  <p>Tabla: ${tableHtml}</p>`;
+            if (whereHtml) html += `\n  <p>Filtro: ${whereHtml}</p>`;
+            html += `\n</div>`;
+            stepEl.innerHTML = html;
+        } else if (/SELECT.*FROM.*WHERE/i.test(query) && (/UNION|SELECT.*\(SELECT/i.test(query))) {
+            // Consultas complejas con UNION o subconsultas (Reto 6)
+            let parts = query.split(/UNION/i);
+            let html = `<div class="complex-query">\n  <p>🔗 Consulta compuesta detectada:</p>`;
+            
+            parts.forEach((part, index) => {
+                let isInjection = /information_schema|SELECT.*\(SELECT/i.test(part);
+                let partClass = isInjection ? 'sql-red' : 'sql-blue';
+                html += `\n  <p>Parte ${index + 1}: <span class='${partClass}'>${part.trim()}</span></p>`;
+            });
+            
+            html += `\n</div>`;
+            stepEl.innerHTML = html;
         } else {
-            document.getElementById('sql-query-step').textContent = '// Esperando una interacción...';
+            stepEl.textContent = '// Esperando una interacción...';
         }
     }
 
@@ -610,47 +923,107 @@
 
     function updateQueryBreakdown(query, detectedInjection) {
         const breakdownEl = document.getElementById('breakdown-content');
-        const parts = {
-            select: query.match(/SELECT\s+([^FROM]+)/i)?.[1]?.trim() || '',
-            from: query.match(/FROM\s+(\w+)/i)?.[1] || '',
-            where: query.match(/WHERE\s+(.+?)(;|$)/i)?.[1]?.trim() || '',
-            injection: detectedInjection ? true : false
-        };
-        
         let breakdown = '<div class="space-y-2 text-xs">';
         
+        // Análisis más específico para diferentes tipos de consultas
+        let parts = {};
+        
+        // Identificar tipo de consulta y extraer partes
+        if (/SELECT.*FROM.*WHERE/i.test(query)) {
+            // Consulta SELECT típica
+            parts.select = query.match(/SELECT\s+([^FROM]+)/i)?.[1]?.trim() || '';
+            parts.from = query.match(/FROM\s+(\w+)/i)?.[1] || '';
+            parts.where = query.match(/WHERE\s+(.+?)(?:ORDER BY|LIMIT|;|$)/i)?.[1]?.trim() || '';
+            parts.orderBy = query.match(/ORDER BY\s+([^LIMIT;]+)/i)?.[1]?.trim() || '';
+            parts.limit = query.match(/LIMIT\s+([^;]+)/i)?.[1]?.trim() || '';
+        } else if (/SELECT.*FROM/i.test(query)) {
+            // Consulta SELECT sin WHERE
+            parts.select = query.match(/SELECT\s+([^FROM]+)/i)?.[1]?.trim() || '';
+            parts.from = query.match(/FROM\s+(\w+)/i)?.[1] || '';
+            parts.orderBy = query.match(/ORDER BY\s+([^LIMIT;]+)/i)?.[1]?.trim() || '';
+            parts.limit = query.match(/LIMIT\s+([^;]+)/i)?.[1]?.trim() || '';
+        }
+        
+        // Mostrar partes de la consulta
         if (parts.select) {
-            breakdown += `<div><span class="text-blue-400 font-bold">SELECT:</span> <span class="text-gray-300">${parts.select}</span></div>`;
+            // Resaltar SELECT maliciosos
+            let selectHtml = parts.select;
+            if (/UNION\s+SELECT/i.test(query)) {
+                selectHtml = selectHtml.replace(/(UNION\s+SELECT[^,]*)/gi, '<span class="text-red-400 font-bold bg-red-900/30 px-1 rounded">$1</span>');
+            }
+            breakdown += `<div><span class="text-blue-400 font-bold">SELECT:</span> <span class="text-gray-300">${selectHtml}</span></div>`;
         }
         
         if (parts.from) {
-            breakdown += `<div><span class="text-green-400 font-bold">FROM:</span> <span class="text-cyan-300">${parts.from}</span></div>`;
+            // Resaltar tablas sensibles
+            let fromHtml = parts.from;
+            if (/information_schema/i.test(parts.from)) {
+                fromHtml = `<span class="text-red-400 font-bold bg-red-900/30 px-1 rounded">${parts.from}</span>`;
+            }
+            breakdown += `<div><span class="text-green-400 font-bold">FROM:</span> <span class="text-cyan-300">${fromHtml}</span></div>`;
         }
         
         if (parts.where) {
-            breakdown += `<div><span class="text-yellow-400 font-bold">WHERE:</span> <span class="text-gray-300">${parts.where}</span></div>`;
-            
-            if (detectedInjection) {
-                breakdown += '<div class="mt-2 p-2 bg-red-900/30 rounded border border-red-500">';
-                breakdown += '<div class="text-red-400 font-bold text-xs mb-1">⚠️ INYECCIÓN DETECTADA:</div>';
-                switch(detectedInjection.type) {
-                    case 'Inyección Booleana Clásica':
-                        breakdown += '<div class="text-red-300 text-xs">La condición <code>OR \'1=1\'</code> siempre es verdadera, saltándose la autenticación.</div>';
-                        break;
-                    case 'Ataque UNION SELECT':
-                        breakdown += '<div class="text-red-300 text-xs">El <code>UNION SELECT</code> combina resultados de otra tabla, exponiendo datos sensibles.</div>';
-                        break;
-                    case 'Inyección Basada en Tiempo':
-                        breakdown += '<div class="text-red-300 text-xs">La función <code>SLEEP()</code> causa un retraso, confirmando la vulnerabilidad.</div>';
-                        break;
-                }
-                breakdown += '</div>';
-            }
+            // Resaltar payloads maliciosos en WHERE
+            let whereHtml = parts.where;
+            whereHtml = whereHtml.replace(/(OR\s+'1'='1'|OR\s+1=1|SLEEP\([^)]*\)|information_schema)/gi, '<span class="text-red-400 font-bold bg-red-900/30 px-1 rounded">$1</span>');
+            breakdown += `<div><span class="text-yellow-400 font-bold">WHERE:</span> <span class="text-gray-300">${whereHtml}</span></div>`;
         }
         
-        if (!detectedInjection && (query.includes("'") || query.includes('"'))) {
-            breakdown += '<div class="mt-2 p-2 bg-yellow-900/30 rounded border border-yellow-500">';
-            breakdown += '<div class="text-yellow-400 font-bold text-xs mb-1">⚠️ PRECAUCIÓN:</div>';
+        if (parts.orderBy) {
+            // Resaltar ORDER BY maliciosos
+            let orderByHtml = parts.orderBy;
+            if (/SLEEP\(|information_schema|UNION|SELECT/i.test(parts.orderBy)) {
+                orderByHtml = orderByHtml.replace(/(SLEEP\([^)]*\)|information_schema|UNION[^,]*|SELECT[^,]*)/gi, '<span class="text-red-400 font-bold bg-red-900/30 px-1 rounded">$1</span>');
+            }
+            breakdown += `<div><span class="text-purple-400 font-bold">ORDER BY:</span> <span class="text-gray-300">${orderByHtml}</span></div>`;
+        }
+        
+        if (parts.limit) {
+            breakdown += `<div><span class="text-indigo-400 font-bold">LIMIT:</span> <span class="text-gray-300">${parts.limit}</span></div>`;
+        }
+        
+        // Análisis de inyección específico
+        if (detectedInjection) {
+            breakdown += '<div class="mt-3 p-3 bg-red-900/30 rounded border border-red-500">';
+            breakdown += '<div class="text-red-400 font-bold text-sm mb-2">⚠️ INYECCIÓN DETECTADA</div>';
+            
+            switch(detectedInjection.type) {
+                case 'Inyección Booleana Clásica':
+                    breakdown += '<div class="text-red-300 text-xs mb-2"><strong>Técnica:</strong> Manipulación de condiciones lógicas</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• La condición <code>OR \'1\'=\'1\'</code> siempre es verdadera</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• Esto bypassa la autenticación completamente</div>';
+                    break;
+                case 'Ataque UNION SELECT':
+                    breakdown += '<div class="text-red-300 text-xs mb-2"><strong>Técnica:</strong> Combinación de consultas</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• <code>UNION SELECT</code> combina resultados de múltiples consultas</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• Permite extraer datos de otras tablas</div>';
+                    break;
+                case 'Inyección Basada en Tiempo':
+                    breakdown += '<div class="text-red-300 text-xs mb-2"><strong>Técnica:</strong> Análisis temporal</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• <code>SLEEP()</code> introduce retrasos medibles</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• Confirma vulnerabilidad sin mostrar datos</div>';
+                    break;
+                case 'Inyección Basada en Errores':
+                    breakdown += '<div class="text-red-300 text-xs mb-2"><strong>Técnica:</strong> Extracción por errores</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• <code>information_schema</code> contiene metadatos del sistema</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• Los errores SQL pueden revelar estructura de BD</div>';
+                    break;
+                case 'Inyección en ORDER BY/LIMIT':
+                    breakdown += '<div class="text-red-300 text-xs mb-2"><strong>Técnica:</strong> Manipulación de ordenamiento</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• Inyección en cláusulas de ordenamiento</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• Puede provocar errores informativos</div>';
+                    break;
+                case 'Inyección en Subconsulta':
+                    breakdown += '<div class="text-red-300 text-xs mb-2"><strong>Técnica:</strong> Consultas anidadas</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• Subconsultas pueden filtrar información</div>';
+                    breakdown += '<div class="text-red-300 text-xs">• Bypass de validaciones superficiales</div>';
+                    break;
+            }
+            breakdown += '</div>';
+        } else if (query.includes("'") || query.includes('"')) {
+            breakdown += '<div class="mt-3 p-3 bg-yellow-900/30 rounded border border-yellow-500">';
+            breakdown += '<div class="text-yellow-400 font-bold text-sm mb-1">⚠️ PRECAUCIÓN</div>';
             breakdown += '<div class="text-yellow-300 text-xs">Se detectan comillas en la entrada. Usar parámetros preparados previene inyecciones.</div>';
             breakdown += '</div>';
         }
