@@ -703,7 +703,8 @@ function getUserData(userId) {
     });
 
     function setupChallengeHandlers() {
-        for (let i = 1; i <= 5; i++) {
+        const totalChallenges = Object.keys(secureChallenges).length;
+        for (let i = 1; i <= totalChallenges; i++) {
             const btn = document.getElementById(`btn-${i}`);
             const textarea = document.getElementById(`input-${i}-code`);
             
@@ -940,7 +941,8 @@ function getUserData(userId) {
             state.completedLevels.push(id);
             
             // Desbloquear siguiente nivel
-            if (id < 5 && !state.unlockedLevels.includes(id + 1)) {
+            const totalChallenges = Object.keys(secureChallenges).length;
+            if (id < totalChallenges && !state.unlockedLevels.includes(id + 1)) {
                 state.unlockedLevels.push(id + 1);
                 unlockChallenge(id + 1);
                 showToast(`¡Nivel ${id + 1} desbloqueado!`);
@@ -959,7 +961,7 @@ function getUserData(userId) {
     }
 
     function updateProgress() {
-        const totalChallenges = 5;
+        const totalChallenges = Object.keys(secureChallenges).length;
         const completedCount = state.completedLevels.length;
         const percentage = (completedCount / totalChallenges) * 100;
         
