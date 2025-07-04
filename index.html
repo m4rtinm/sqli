@@ -124,9 +124,37 @@
         button:disabled:hover {
             background-color: inherit !important;
         }
+        .nav-link {
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .nav-link:hover {
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+
+    <!-- Navegación -->
+    <nav class="bg-white dark:bg-gray-800 shadow-lg mb-8">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-8">
+                    <h1 class="text-xl font-bold text-blue-600 dark:text-blue-400">🎯 Laboratorio de Hacking</h1>
+                    <div class="hidden md:flex space-x-4">
+                        <a href="index.html" class="nav-link bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded">🎯 Laboratorio de Hacking</a>
+                        <a href="secure-coding.html" class="nav-link text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 px-3 py-1 rounded">🛡️ Código Seguro</a>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                    Aprende a hackear y defenderte
+                </div>
+            </div>
+        </div>
+    </nav>
 
     <!-- Notificación Toast -->
     <div id="toast" class="toast fixed bottom-5 right-5 bg-green-500 text-white py-3 px-6 rounded-lg shadow-xl z-50">
