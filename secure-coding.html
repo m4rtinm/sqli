@@ -917,14 +917,6 @@ function getUserData(userId) {
         return recommendations;
     }
 
-    function updateSecurityStatus(message, type) {
-        const securityStatus = document.getElementById('security-status');
-        securityStatus.textContent = message;
-        
-        const vulnStatus = document.getElementById('vulnerability-status');
-        vulnStatus.textContent = type;
-        vulnStatus.className = `vulnerability-indicator ${type === 'ESPERANDO' ? 'vuln-safe' : 'vuln-vulnerable'}`;
-    }
 
     function showResult(element, message, type) {
         element.innerHTML = message;
