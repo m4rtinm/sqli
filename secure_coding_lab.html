@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratorio de Código Seguro: Prevención de SQLi</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .container { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+        h1, h2 { color: #333; }
+        textarea { width: 98%; min-height: 150px; margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; font-family: monospace; font-size: 14px; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .result, .pista { margin-top: 20px; padding: 15px; border-radius: 4px; }
+        .result { background-color: #e9ecef; border: 1px solid #ced4da; }
+        .pista { background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; }
+        .vulnerable { color: red; font-weight: bold; }
+        .seguro { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Laboratorio de Código Seguro: Previniendo Inyecciones SQL</h1>
+
+        <h2>Objetivo del Laboratorio</h2>
+        <p>
+            Bienvenido al laboratorio de código seguro. En los retos anteriores, aprendiste a identificar y explotar vulnerabilidades de inyección SQL.
+            Ahora, el objetivo es aprender a <strong>defender</strong> nuestras aplicaciones contra estos ataques.
+            En este ejercicio, trabajarás con un fragmento de código vulnerable similar al de un formulario de inicio de sesión y tu tarea será modificarlo para hacerlo seguro.
+        </p>
+
+        <h2>El Reto: Asegura el Inicio de Sesión</h2>
+        <p>
+            El siguiente fragmento de código PHP simula la verificación de credenciales de un usuario contra una base de datos.
+            Actualmente, es vulnerable a inyección SQL. Modifica la consulta SQL para prevenir esta vulnerabilidad.
+        </p>
+
+        <textarea id="codeEditor">
+<?php
+// Simulación de conexión a base de datos (no se conecta realmente aquí)
+// $db = new PDO('mysql:host=localhost;dbname=test', 'user', 'password');
+
+$username = $_POST['username']; // Dato directamente del usuario
+$password = $_POST['password']; // Dato directamente del usuario
+
+// ¡VULNERABLE! El atacante puede manipular $username y $password
+$sql = "SELECT * FROM users WHERE username = '$username' AND password = '$password'";
+
+echo "Consulta generada: " . htmlspecialchars($sql);
+
+// Aquí iría la lógica para ejecutar la consulta y verificar el usuario...
+// if ($user) {
+//     echo "Login exitoso";
+// } else {
+//     echo "Login fallido";
+// }
+?>
+        </textarea>
+
+        <button onclick="verificarCodigo()">Verificar Código</button>
+
+        <div class="result" id="verificationResult">
+            Presiona "Verificar Código" para evaluar tu solución.
+        </div>
+
+        <h2>Pista</h2>
+        <div class="pista">
+            <p>
+                Para prevenir la inyección SQL, debes evitar concatenar directamente las entradas del usuario en tus consultas SQL.
+                La mejor práctica es utilizar <strong>consultas parametrizadas</strong> (también conocidas como sentencias preparadas).
+            </p>
+            <p>
+                En PHP con PDO, esto se hace usando placeholders (como <code>?</code> o placeholders nombrados como <code>:username</code>) en tu consulta SQL
+                y luego "bindeando" los valores de las variables a estos placeholders.
+            </p>
+            <p>Ejemplo conceptual con placeholders de interrogación (<code>?</code>):</p>
+            <pre>
+$stmt = $db->prepare("SELECT * FROM users WHERE username = ? AND password = ?");
+$stmt->execute([$username, $password]);
+// $user = $stmt->fetch();
+            </pre>
+        </div>
+
+    </div>
+
+    <script>
+        function verificarCodigo() {
+            const codigo = document.getElementById('codeEditor').value;
+            const resultadoDiv = document.getElementById('verificationResult');
+
+            // Lógica de verificación simple (esto se mejorará en el siguiente paso)
+            // Por ahora, buscamos la presencia de '=' directamente antes de una variable entre comillas
+            // y la ausencia de 'prepare' y 'execute' o '?' que son indicadores de parametrización.
+
+            const vulnerablePatternSimple = /(\w+\s*=\s*['"]\s*\$\w+\s*['"])/i; // Detecta cosas como 'col = \'$var\''
+            const notSecurePattern = /(\$sql\s*=\s*".*?\$\w+.*?")/i; // Busca la concatenación directa en la variable $sql
+
+            // Indicadores de una posible solución segura (simplificado)
+            const securePatternPrepare = /\.prepare\s*\(/i;
+            const securePatternExecute = /\.execute\s*\(/i;
+            const securePatternPlaceholder = /\s*=\s*\?\s*/i;
+
+
+            if (codigo.includes("SELECT * FROM users WHERE username = ? AND password = ?") &&
+                (codigo.includes("->prepare") || codigo.includes("->execute")) &&
+                !notSecurePattern.test(codigo.substring(codigo.indexOf("SELECT")))) {
+                resultadoDiv.innerHTML = '<span class="seguro">¡Bien hecho!</span> Parece que has utilizado consultas preparadas. Este es un buen camino para asegurar el código. Recuerda que la implementación completa requeriría bindeo de parámetros y ejecución.';
+                resultadoDiv.className = 'result seguro-bg'; // Clase para fondo verde (definir en CSS)
+            } else if (securePatternPrepare.test(codigo) && securePatternExecute.test(codigo) && securePatternPlaceholder.test(codigo)) {
+                 resultadoDiv.innerHTML = '<span class="seguro">¡Buen intento!</span> Usar `prepare`, `execute` y placeholders `?` es la dirección correcta. Asegúrate de que la consulta SQL esté correctamente formada con los placeholders.';
+                 resultadoDiv.className = 'result seguro-bg';
+            } else if (notSecurePattern.test(codigo) || vulnerablePatternSimple.test(codigo)) {
+                resultadoDiv.innerHTML = '<span class="vulnerable">Vulnerable:</span> El código todavía parece construir la consulta SQL concatenando directamente la entrada del usuario. Intenta usar sentencias preparadas/parametrizadas.';
+                resultadoDiv.className = 'result vulnerable-bg'; // Clase para fondo rojo (definir en CSS)
+            } else {
+                resultadoDiv.innerHTML = 'No se pudo determinar automáticamente. Revisa la pista y asegúrate de que estás utilizando consultas preparadas correctamente. Busca evitar la concatenación directa de variables en la cadena SQL.';
+                resultadoDiv.className = 'result';
+            }
+        }
+
+        // Añadir clases de fondo para los resultados
+        const styleSheet = document.createElement("style");
+        styleSheet.type = "text/css";
+        styleSheet.innerText = `
+            .seguro-bg { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+            .vulnerable-bg { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        `;
+        document.head.appendChild(styleSheet);
+    </script>
+</body>
+</html>
