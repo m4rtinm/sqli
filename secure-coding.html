@@ -802,7 +802,7 @@ function getUserData(userId) {
 
         const challenge = secureChallenges[id];
         const analysis = challenge.check(code);
-        
+
         if (analysis.secure) {
             showResult(result, `✅ ¡Excelente! Tu código es seguro. Puntuación: ${analysis.score}/100`, 'success');
             completeChallenge(id);
@@ -810,7 +810,23 @@ function getUserData(userId) {
             const issues = analysis.issues.join('<br>• ');
             showResult(result, `❌ Código inseguro. Puntuación: ${analysis.score}/100<br><br>Problemas encontrados:<br>• ${issues}`, 'error');
         }
-        
+
+        // Ejecutar la consulta para demostrar su funcionamiento
+        const query = extractQuery(code);
+        if (query) {
+            runQuery(query, ["' OR 1=1 --", 'pass'])
+                .then(res => {
+                    if (res.success) {
+                        result.innerHTML += `<div class="mt-2 text-xs">Filas devueltas: ${res.data.length}</div>`;
+                    } else {
+                        result.innerHTML += `<div class="mt-2 text-xs text-red-500">Error: ${res.error}</div>`;
+                    }
+                })
+                .catch(err => {
+                    result.innerHTML += `<div class="mt-2 text-xs text-red-500">${err.message}</div>`;
+                });
+        }
+
         updateSecurityAnalysis(code, analysis, challenge.vulnerabilities);
     }
 
@@ -983,6 +999,20 @@ function getUserData(userId) {
         setTimeout(() => {
             toast.classList.remove('show');
         }, 3000);
+    }
+
+    async function runQuery(query, params) {
+        const res = await fetch('http://localhost:3000/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, params })
+        });
+        return res.json();
+    }
+
+    function extractQuery(code) {
+        const m = code.match(/query\s*=\s*[`'"]([^`'"]+)[`'"]/);
+        return m ? m[1] : null;
     }
     </script>
 
