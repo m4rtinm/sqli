@@ -1,990 +1,1070 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laboratorio de Código Seguro: Prevención de SQLi</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .toast { opacity: 0; transition: opacity 0.3s ease-in-out; }
-        .toast.show { opacity: 1; }
-        .challenge-card.locked { opacity: 0.6; pointer-events: none; }
-        .challenge-card { transition: all 0.3s ease; }
-        .vulnerability-indicator {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .vuln-safe { background: #059669; color: white; }
-        .vuln-vulnerable { background: #dc2626; color: white; }
-        .vuln-partial { background: #d97706; color: white; }
-        .sql-red { color: #ef4444; }
-        .sql-blue { color: #3b82f6; }
-        .sql-green { color: #10b981; }
-        .sql-gray { color: #6b7280; }
-        .sql-table { color: #f59e0b; }
-        .font-fira { font-family: 'Courier New', monospace; }
-        .code-editor {
-            background: #1f2937;
-            border: 1px solid #374151;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-        .code-editor:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-        }
-        .vulnerability-example {
-            background: linear-gradient(45deg, #fee2e2, #fef2f2);
-            border-left: 4px solid #dc2626;
-        }
-        .vulnerability-example pre code {
-            color: #1f2937 !important;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 8px;
-            border-radius: 4px;
-            display: block;
-        }
-        .secure-example {
-            background: linear-gradient(45deg, #d1fae5, #f0fdf4);
-            border-left: 4px solid #059669;
-        }
-        .secure-example pre code {
-            color: #1f2937 !important;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 8px;
-            border-radius: 4px;
-            display: block;
-        }
-        .code-preview {
-            background: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 8px;
-            color: #e2e8f0;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.4;
-        }
-        .code-highlight-vuln {
-            background-color: rgba(239, 68, 68, 0.2);
-            border-left: 3px solid #ef4444;
-            padding-left: 8px;
-        }
-        .code-highlight-safe {
-            background-color: rgba(16, 185, 129, 0.2);
-            border-left: 3px solid #10b981;
-            padding-left: 8px;
-        }
-        .step-indicator {
-            display: inline-block;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: #3b82f6;
-            color: white;
-            text-align: center;
-            line-height: 24px;
-            font-size: 12px;
-            font-weight: bold;
-            margin-right: 8px;
-        }
-        .step-indicator.completed {
-            background: #10b981;
-        }
-        .step-indicator.current {
-            background: #f59e0b;
-            animation: pulse 2s infinite;
-        }
-        .nav-link {
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
-        .nav-link:hover {
-            background-color: #f3f4f6;
-            color: #1f2937;
-        }
-    </style>
+  <!-- Blockly + generador Python (CDN unpkg) -->
+  <script src="https://unpkg.com/blockly@10.3.1/blockly.min.js"></script>
+  <script src="https://unpkg.com/blockly@10.3.1/python.min.js"></script>
+  
+  <!-- Tema Scratch (con pines tipo Lego) -->
+  <script src="https://unpkg.com/blockly@10.3.1/themes/scratch.min.js"></script>
+  
+  <!-- PrismJS para resaltado Python -->
+  <link rel="stylesheet" href="https://unpkg.com/prismjs/themes/prism-tomorrow.min.css" />
+  <script src="https://unpkg.com/prismjs/components/prism-core.min.js"></script>
+  <script src="https://unpkg.com/prismjs/components/prism-python.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sandbox de Desarrollo Seguro con Python (WASM) - Scratch Blocks</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+/* ——— COLORES ——— */
+.block-vulnerable { background:#d32f2f; border-left:6px solid #b71c1c; }
+.block-secure     { background:#43a047; border-left:6px solid #1b5e20; }
+.block-neutral    { background:#546e7a; border-left:6px solid #37474f; }
+
+    body {font-family:'Inter',sans-serif;}
+    .font-fira{font-family:'Fira Code',monospace;}
+    .code-editor{background:#282c34;color:#abb2bf;border:none;outline:none;resize:none;}
+    .line-numbers{color:#636d83;padding-right:1rem;text-align:right;user-select:none;}
+    .disabled-overlay{position:absolute;inset:0;background:rgba(0,0,0,.7);z-index:10;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.2rem;border-radius:.75rem;text-align:center;}
+    .tab-button.active{border-color:#2563eb;background:#2563eb;color:#fff;}
+    
+    /* Blockly workspace styling */
+    #blocklyDiv {
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    
+    /* Run button styling */
+    .run-button {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 1000;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .run-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    }
+    
+    .run-button:disabled {
+      background: #6b7280;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    /* Elementos que solo aparecen en modo bloques */
+    .blocks-only {
+      display: none;
+    }
+    
+    .code-mode-active .blocks-only {
+      display: block;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+<div class="container mx-auto p-4 md:p-8">
+<header class="text-center mb-8">
+  <h1 class="text-4xl font-bold text-green-600 dark:text-green-400">Sandbox de Desarrollo Seguro</h1>
+  <p class="mt-2 text-lg text-gray-600 dark:text-gray-400">Programa con <span class="font-bold">bloques Scratch</span> y genera <span class="font-bold">Python real</span> en tu navegador.</p>
+</header>
 
-    <!-- Navegación -->
-    <nav class="bg-white dark:bg-gray-800 shadow-lg mb-8">
-        <div class="container mx-auto px-4">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center space-x-8">
-                    <h1 class="text-xl font-bold text-blue-600 dark:text-blue-400">🛡️ Laboratorio de Código Seguro</h1>
-                    <div class="hidden md:flex space-x-4">
-                        <a href="index.html" class="nav-link text-gray-600 dark:text-gray-300">🎯 Laboratorio de Hacking</a>
-                        <a href="secure-coding.html" class="nav-link bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">🛡️ Código Seguro</a>
-                    </div>
-                </div>
-                <div class="text-sm text-gray-600 dark:text-gray-400">
-                    Aprende a defenderte contra SQLi
-                </div>
-            </div>
-        </div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- ─────────────────── PANEL IZQUIERDO - BLOCKLY ─────────────────── -->
+<div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 relative">
+  <div id="loading-overlay" class="disabled-overlay">
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-8 h-8 border-4 border-dashed rounded-full animate-spin border-blue-400"></div>
+      <p>Inicializando Python en el navegador...</p>
+      <p class="text-sm">(Esto puede tardar unos segundos)</p>
+    </div>
+  </div>
+
+  <h2 class="text-2xl font-bold mb-2">✍️ Editor de Código Python</h2>
+  <p class="text-gray-600 dark:text-gray-400 mb-4">Escribe tu función de login segura directamente en Python.</p>
+
+  <!-- Tabs -->
+  <div class="mb-4 border-b border-gray-200 dark:border-gray-700">
+    <nav class="flex -mb-px" aria-label="Tabs">
+      <button onclick="changeMode('code')"   id="tab-code"   class="tab-button active w-1/2 py-3 px-1 text-center border-b-2 font-medium text-sm">✍️ Código</button>
+      <button onclick="changeMode('blocks')" id="tab-blocks" class="tab-button      w-1/2 py-3 px-1 text-center border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700">🧩 Bloques</button>
     </nav>
+  </div>
 
-    <!-- Notificación Toast -->
-    <div id="toast" class="toast fixed bottom-5 right-5 bg-green-500 text-white py-3 px-6 rounded-lg shadow-xl z-50">
-        <p id="toast-message">¡Desafío completado!</p>
+  <!-- MODO CÓDIGO -->
+  <div id="code-mode">
+    <div class="bg-gray-800 rounded-lg p-4 font-fira text-sm flex">
+      <div id="line-numbers" class="line-numbers"></div>
+      <textarea id="code-editor" class="code-editor w-full h-96 font-fira text-sm" spellcheck="false" placeholder="Escribe tu código Python aquí..."></textarea>
     </div>
+    <p class="text-sm text-gray-500 mt-2">💡 Tip: Escribe tu función de login aquí. El código se analizará automáticamente para detectar vulnerabilidades.</p>
+  </div>
 
-    <div class="container mx-auto p-4 md:p-8">
-        <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-green-600 dark:text-green-400">Laboratorio de Código Seguro: Prevención de SQLi</h1>
-            <p class="mt-2 text-lg text-gray-600 dark:text-gray-400">Aprende a escribir código seguro y protegerte contra inyecciones SQL.</p>
-        </header>
-
-        <!-- Barra de progreso -->
-        <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mb-8">
-            <div id="progress-bar" class="bg-green-600 h-2.5 rounded-full relative overflow-hidden" style="width: 0%; transition: width 0.5s ease-in-out;">
-                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse"></div>
-            </div>
-        </div>
-        <div class="text-center mb-4">
-            <span id="progress-text" class="text-sm text-gray-600 dark:text-gray-400">0% completado - ¡Comienza a asegurar tu código!</span>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            <!-- Panel Izquierdo: Desafíos de Código Seguro -->
-            <div class="space-y-6">
-                <h2 class="text-2xl font-bold">🛡️ Desafíos de Código Seguro</h2>
-                
-                <!-- Desafío 1: Statements Preparados -->
-                <div id="challenge-1" class="challenge-card bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-green-500">
-                    <div class="flex justify-between items-start">
-                        <h3 class="text-xl font-bold flex-1 mr-2">Nivel 1: Implementa Prepared Statements</h3>
-                        <div class="flex flex-col gap-2 sm:flex-row">
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">⭐ Básico</span>
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Prepared Statements</span>
-                        </div>
-                    </div>
-                    <div class="challenge-content">
-                        <p class="mt-2 text-gray-600 dark:text-gray-400">Tienes un login vulnerable. Tu misión: reescribir el código usando <strong>prepared statements</strong> para prevenir inyecciones SQL.</p>
-                        
-                        <!-- Pasos educativos -->
-                        <div class="mt-4 mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
-                            <h4 class="font-bold text-blue-800 dark:text-blue-200 mb-2">📚 Pasos para completar este desafío:</h4>
-                            <div class="space-y-2 text-sm">
-                                <div id="step-1-1" class="flex items-center">
-                                    <span class="step-indicator" id="indicator-1-1">1</span>
-                                    <span>Reemplaza la concatenación de strings con placeholders (?)</span>
-                                </div>
-                                <div id="step-1-2" class="flex items-center">
-                                    <span class="step-indicator" id="indicator-1-2">2</span>
-                                    <span>Pasa los parámetros como array separado [username, password]</span>
-                                </div>
-                                <div id="step-1-3" class="flex items-center">
-                                    <span class="step-indicator" id="indicator-1-3">3</span>
-                                    <span>Usa métodos como db.prepare() o db.query() con parámetros</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Código vulnerable -->
-                        <div class="mt-4 vulnerability-example p-4 rounded-lg">
-                            <h4 class="font-bold text-red-800 mb-2">❌ Código Vulnerable:</h4>
-                            <pre class="text-sm font-mono overflow-x-auto"><code>function authenticateUser(username, password) {
-    // ⚠️ PELIGRO: Concatenación directa permite inyección
-    const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
-    return db.query(query);
-}</code></pre>
-                            <div class="mt-2 p-2 bg-red-100 dark:bg-red-900/30 rounded text-xs">
-                                <strong>¿Por qué es vulnerable?</strong> Si un atacante ingresa <code>'admin' --</code> como usuario, la consulta se convierte en: 
-                                <code class="block mt-1 font-mono">SELECT * FROM users WHERE username = 'admin' -- ' AND password = '...'</code>
-                                El <code>--</code> comenta el resto, ignorando la validación de contraseña.
-                            </div>
-                        </div>
-
-                        <!-- Editor de código seguro -->
-                        <div class="mt-4">
-                            <h4 class="font-bold text-green-800 mb-2">✅ Tu código seguro:</h4>
-                            <textarea id="input-1-code" class="code-editor w-full h-32 p-3 text-gray-100" placeholder="function authenticateUser(username, password) {
-    // Paso 1: Usa placeholders en lugar de concatenación
-    const query = 'SELECT * FROM users WHERE username = ? AND password = ?';
-    // Paso 2: Pasa parámetros por separado
-    return db.prepare(query).all(username, password);
-}">function authenticateUser(username, password) {
-    // Escribe aquí tu implementación segura usando prepared statements
-    
-}</textarea>
-                        </div>
-
-                        <!-- Render en tiempo real -->
-                        <div class="mt-4">
-                            <h4 class="font-bold text-blue-800 mb-2">🔍 Vista previa de tu código:</h4>
-                            <div class="code-preview p-4">
-                                <pre id="code-preview-1" class="text-sm m-0 whitespace-pre-wrap">// Escribe código arriba para ver el análisis en tiempo real...</pre>
-                            </div>
-                        </div>
-
-                        <button id="btn-1" class="mt-4 w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700">Validar Código Seguro</button>
-                        
-                        <div class="mt-2 text-right"><button onclick="toggleHint(1)" class="text-sm text-green-500 hover:underline">Necesito una pista</button></div>
-                        <p id="hint-1" class="hidden mt-2 p-2 bg-green-50 dark:bg-green-900/20 text-sm rounded">
-                            Los <strong>prepared statements</strong> separan la lógica SQL de los datos. Usa placeholders como <code class="font-fira bg-green-200 dark:bg-green-800 px-1 rounded">?</code> o <code class="font-fira bg-green-200 dark:bg-green-800 px-1 rounded">$1, $2</code> y pasa los parámetros por separado.
-                        </p>
-                        <div id="result-1" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
-                    </div>
-                </div>
-
-                <!-- Desafío 2: Validación de Entrada -->
-                <div id="challenge-2" class="challenge-card locked bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-gray-500">
-                    <div class="flex justify-between items-start">
-                        <h3 class="text-xl font-bold flex-1 mr-2">Nivel 2: Validación y Sanitización</h3>
-                        <div class="flex flex-col gap-2 sm:flex-row">
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">⭐⭐ Intermedio</span>
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">Input Validation</span>
-                        </div>
-                    </div>
-                    <div class="challenge-content">
-                        <p class="mt-2 text-gray-600 dark:text-gray-400">Implementa validación robusta para un buscador de productos. Valida tipos de datos, longitudes y caracteres permitidos.</p>
-                        
-                        <!-- Pasos educativos -->
-                        <div class="mt-4 mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border-l-4 border-yellow-500">
-                            <h4 class="font-bold text-yellow-800 dark:text-yellow-200 mb-2">📚 Pasos para completar este desafío:</h4>
-                            <div class="space-y-2 text-sm">
-                                <div id="step-2-1" class="flex items-center">
-                                    <span class="step-indicator" id="indicator-2-1">1</span>
-                                    <span>Validar que la entrada sea de tipo string</span>
-                                </div>
-                                <div id="step-2-2" class="flex items-center">
-                                    <span class="step-indicator" id="indicator-2-2">2</span>
-                                    <span>Verificar longitud máxima (ej: 100 caracteres)</span>
-                                </div>
-                                <div id="step-2-3" class="flex items-center">
-                                    <span class="step-indicator" id="indicator-2-3">3</span>
-                                    <span>Rechazar caracteres peligrosos: ' " ; -- \</span>
-                                </div>
-                                <div id="step-2-4" class="flex items-center">
-                                    <span class="step-indicator" id="indicator-2-4">4</span>
-                                    <span>Usar prepared statements para la consulta final</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-4 vulnerability-example p-4 rounded-lg">
-                            <h4 class="font-bold text-red-800 mb-2">❌ Código Vulnerable:</h4>
-                            <pre class="text-sm font-mono overflow-x-auto"><code>function searchProducts(searchTerm) {
-    // ⚠️ Sin validación - acepta cualquier entrada
-    const query = `SELECT * FROM products WHERE name LIKE '%${searchTerm}%'`;
-    return db.query(query);
-}</code></pre>
-                            <div class="mt-2 p-2 bg-red-100 dark:bg-red-900/30 rounded text-xs">
-                                <strong>¿Por qué es vulnerable?</strong> Si un atacante ingresa <code>' UNION SELECT username,password FROM users --</code>, 
-                                la consulta se convierte en un ataque UNION que expone datos de usuarios.
-                            </div>
-                        </div>
-
-                        <div class="mt-4">
-                            <h4 class="font-bold text-green-800 mb-2">✅ Tu código seguro:</h4>
-                            <textarea id="input-2-code" class="code-editor w-full h-40 p-3 text-gray-100" placeholder="function searchProducts(searchTerm) {
-    // Paso 1: Validar tipo
-    if (typeof searchTerm !== 'string') {
-        throw new Error('Tipo de entrada inválido');
-    }
-    
-    // Paso 2: Validar longitud
-    if (searchTerm.length > 100) {
-        throw new Error('Entrada demasiado larga');
-    }
-    
-    // Paso 3: Validar caracteres
-    if (/['\";\\--]/.test(searchTerm)) {
-        throw new Error('Caracteres no permitidos');
-    }
-    
-    // Paso 4: Usar prepared statement
-    const query = 'SELECT * FROM products WHERE name LIKE ?';
-    return db.prepare(query).all(`%${searchTerm}%`);
-}">function searchProducts(searchTerm) {
-    // Implementa validación y sanitización aquí
-    
-}</textarea>
-                        </div>
-
-                        <!-- Render en tiempo real -->
-                        <div class="mt-4">
-                            <h4 class="font-bold text-blue-800 mb-2">🔍 Vista previa de tu código:</h4>
-                            <div class="code-preview p-4">
-                                <pre id="code-preview-2" class="text-sm m-0 whitespace-pre-wrap">// Escribe código arriba para ver el análisis en tiempo real...</pre>
-                            </div>
-                        </div>
-
-                        <button id="btn-2" class="mt-4 w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700">Validar Código Seguro</button>
-                        
-                        <div class="mt-2 text-right"><button onclick="toggleHint(2)" class="text-sm text-green-500 hover:underline">Necesito una pista</button></div>
-                        <p id="hint-2" class="hidden mt-2 p-2 bg-green-50 dark:bg-green-900/20 text-sm rounded">
-                            Valida: <strong>tipo de dato</strong> (string), <strong>longitud máxima</strong>, <strong>caracteres permitidos</strong> (evita <code>'</code>, <code>;</code>, <code>--</code>), y usa <strong>prepared statements</strong> junto con la validación.
-                        </p>
-                        <div id="result-2" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
-                    </div>
-                </div>
-
-                <!-- Desafío 3: Escape de Caracteres -->
-                <div id="challenge-3" class="challenge-card locked bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-gray-500">
-                    <div class="flex justify-between items-start">
-                        <h3 class="text-xl font-bold flex-1 mr-2">Nivel 3: Escapado Seguro</h3>
-                        <div class="flex flex-col gap-2 sm:flex-row">
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">⭐⭐⭐ Avanzado</span>
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">Character Escaping</span>
-                        </div>
-                    </div>
-                    <div class="challenge-content">
-                        <p class="mt-2 text-gray-600 dark:text-gray-400">En ocasiones necesitas concatenar SQL dinámico. Implementa una función de escape segura para neutralizar caracteres peligrosos.</p>
-                        
-                        <div class="mt-4 vulnerability-example p-4 rounded-lg">
-                            <h4 class="font-bold text-red-800 mb-2">❌ Código Vulnerable:</h4>
-                            <pre class="text-sm font-mono overflow-x-auto"><code>function buildDynamicQuery(orderBy, direction) {
-    // Concatenación directa sin validación
-    return `SELECT * FROM products ORDER BY ${orderBy} ${direction}`;
-}</code></pre>
-                        </div>
-
-                        <div class="mt-4">
-                            <h4 class="font-bold text-green-800 mb-2">✅ Tu código seguro:</h4>
-                            <textarea id="input-3-code" class="code-editor w-full h-40 p-3 text-gray-100" placeholder="function buildDynamicQuery(orderBy, direction) {
-    // Implementa escapado y validación segura aquí
-    
-}">function buildDynamicQuery(orderBy, direction) {
-    // Implementa escapado y validación segura aquí
-    
-}</textarea>
-                        </div>
-
-                        <button id="btn-3" class="mt-4 w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700">Validar Código Seguro</button>
-                        
-                        <div class="mt-2 text-right"><button onclick="toggleHint(3)" class="text-sm text-green-500 hover:underline">Necesito una pista</button></div>
-                        <p id="hint-3" class="hidden mt-2 p-2 bg-green-50 dark:bg-green-900/20 text-sm rounded">
-                            Usa <strong>whitelisting</strong> para <code>orderBy</code> (solo columnas válidas) y <code>direction</code> (solo 'ASC'/'DESC'). Si necesitas escapar strings, dobla las comillas simples: <code>'</code> → <code>''</code>.
-                        </p>
-                        <div id="result-3" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
-                    </div>
-                </div>
-
-                <!-- Desafío 4: ORM y Abstracción -->
-                <div id="challenge-4" class="challenge-card locked bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-gray-500">
-                    <div class="flex justify-between items-start">
-                        <h3 class="text-xl font-bold flex-1 mr-2">Nivel 4: Uso de ORM Seguro</h3>
-                        <div class="flex flex-col gap-2 sm:flex-row">
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">⭐⭐⭐⭐ Experto</span>
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">ORM Security</span>
-                        </div>
-                    </div>
-                    <div class="challenge-content">
-                        <p class="mt-2 text-gray-600 dark:text-gray-400">Los ORMs pueden ser vulnerables si se usan incorrectamente. Implementa consultas seguras usando métodos seguros del ORM.</p>
-                        
-                        <div class="mt-4 vulnerability-example p-4 rounded-lg">
-                            <h4 class="font-bold text-red-800 mb-2">❌ Código Vulnerable (ORM inseguro):</h4>
-                            <pre class="text-sm font-mono overflow-x-auto"><code>// Usando raw query en ORM - ¡PELIGROSO!
-function getUserData(userId) {
-    return ORM.query(`SELECT * FROM users WHERE id = ${userId} AND active = 1`);
-}</code></pre>
-                        </div>
-
-                        <div class="mt-4">
-                            <h4 class="font-bold text-green-800 mb-2">✅ Tu código seguro con ORM:</h4>
-                            <textarea id="input-4-code" class="code-editor w-full h-40 p-3 text-gray-100" placeholder="function getUserData(userId) {
-    // Usa métodos seguros del ORM aquí
-    
-}">function getUserData(userId) {
-    // Usa métodos seguros del ORM aquí
-    
-}</textarea>
-                        </div>
-
-                        <button id="btn-4" class="mt-4 w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700">Validar Código Seguro</button>
-                        
-                        <div class="mt-2 text-right"><button onclick="toggleHint(4)" class="text-sm text-green-500 hover:underline">Necesito una pista</button></div>
-                        <p id="hint-4" class="hidden mt-2 p-2 bg-green-50 dark:bg-green-900/20 text-sm rounded">
-                            Evita <code>ORM.query()</code> con strings concatenados. Usa métodos como <code>ORM.where()</code>, <code>ORM.find()</code>, <code>ORM.findById()</code> que automáticamente parametrizan las consultas.
-                        </p>
-                        <div id="result-4" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
-                    </div>
-                </div>
-
-                <!-- Desafío 5: Auditoría de Código -->
-                <div id="challenge-5" class="challenge-card locked bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-gray-500">
-                    <div class="flex justify-between items-start">
-                        <h3 class="text-xl font-bold flex-1 mr-2">Nivel 5: Auditoría y Detección</h3>
-                        <div class="flex flex-col gap-2 sm:flex-row">
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">⭐⭐⭐⭐⭐ Maestro</span>
-                            <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300">Code Audit</span>
-                        </div>
-                    </div>
-                    <div class="challenge-content">
-                        <p class="mt-2 text-gray-600 dark:text-gray-400">Identifica todas las vulnerabilidades en este código complejo y propón las correcciones adecuadas.</p>
-                        
-                        <div class="mt-4 vulnerability-example p-4 rounded-lg">
-                            <h4 class="font-bold text-red-800 mb-2">❌ Código para auditar:</h4>
-                            <pre class="text-sm font-mono overflow-x-auto"><code>function complexQuery(userInput, sortBy, category) {
-    let query = "SELECT p.*, u.username FROM products p JOIN users u ON p.user_id = u.id";
-    
-    if (category) {
-        query += ` WHERE p.category = '${category}'`;
-    }
-    
-    if (userInput) {
-        query += category ? " AND" : " WHERE";
-        query += ` p.name LIKE '%${userInput}%'`;
-    }
-    
-    query += ` ORDER BY p.${sortBy} ASC`;
-    
-    return db.query(query);
-}</code></pre>
-                        </div>
-
-                        <div class="mt-4">
-                            <h4 class="font-bold text-green-800 mb-2">✅ Tu código corregido:</h4>
-                            <textarea id="input-5-code" class="code-editor w-full h-48 p-3 text-gray-100" placeholder="function complexQuery(userInput, sortBy, category) {
-    // Corrige todas las vulnerabilidades aquí
-    
-}">function complexQuery(userInput, sortBy, category) {
-    // Corrige todas las vulnerabilidades aquí
-    
-}</textarea>
-                        </div>
-
-                        <button id="btn-5" class="mt-4 w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700">Validar Auditoría</button>
-                        
-                        <div class="mt-2 text-right"><button onclick="toggleHint(5)" class="text-sm text-green-500 hover:underline">Necesito una pista</button></div>
-                        <p id="hint-5" class="hidden mt-2 p-2 bg-green-50 dark:bg-green-900/20 text-sm rounded">
-                            Encuentra: <strong>3 puntos de inyección</strong> (category, userInput, sortBy). Usa prepared statements, validación de entrada y whitelisting para columnas.
-                        </p>
-                        <div id="result-5" class="mt-4 p-3 rounded-md text-sm min-h-[50px]"></div>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Panel Derecho: Análisis de Seguridad -->
-            <div class="bg-gray-900 rounded-xl shadow-2xl p-6 flex flex-col sticky top-8 h-max">
-                <h2 class="text-2xl font-bold text-gray-200">🔍 Análisis de Seguridad</h2>
-                
-                <!-- Estado de seguridad en tiempo real -->
-                <div class="mt-4">
-                    <h3 class="font-semibold text-gray-300 mb-2">Estado de Seguridad del Código</h3>
-                    <div class="bg-black rounded-lg p-4 font-fira text-sm overflow-x-auto border border-gray-700" id="security-container">
-                        <pre id="security-status" class="text-gray-300 m-0 whitespace-pre-wrap leading-relaxed">// Esperando código para analizar...</pre>
-                    </div>
-                    
-                    <!-- Indicador de vulnerabilidad -->
-                    <div class="mt-2 flex items-center justify-between">
-                        <span id="vulnerability-status" class="vulnerability-indicator vuln-safe">CÓDIGO SEGURO</span>
-                        <span id="security-score" class="text-xs text-gray-400">Puntuación: -/-</span>
-                    </div>
-                </div>
-
-                <!-- Vulnerabilidades detectadas -->
-                <div id="vulnerabilities-box" class="mt-4">
-                    <h3 class="font-semibold text-gray-300 mb-2">🚨 Vulnerabilidades Detectadas</h3>
-                    <div id="vulnerabilities-content" class="p-3 bg-gray-800 rounded-lg text-sm text-gray-300 min-h-[80px] overflow-y-auto" style="max-height: 200px;">
-                        💡 Escribe código para ver el análisis de vulnerabilidades.
-                    </div>
-                </div>
-
-                <!-- Recomendaciones de seguridad -->
-                <div id="recommendations-box" class="mt-4">
-                    <h3 class="font-semibold text-gray-300 mb-2">✅ Recomendaciones</h3>
-                    <div id="recommendations-content" class="p-3 bg-gray-800 rounded-lg text-sm text-gray-300 min-h-[60px]">
-                        // Las recomendaciones aparecerán aquí
-                    </div>
-                </div>
-
-                <!-- Guía de mejores prácticas -->
-                <div id="best-practices" class="mt-4">
-                    <h3 class="font-semibold text-gray-300 mb-2">📚 Mejores Prácticas</h3>
-                    <div class="p-3 bg-gray-800 rounded-lg text-sm text-gray-300">
-                        <ul class="space-y-1 text-xs">
-                            <li>• Usa <span class="text-green-400">prepared statements</span> siempre</li>
-                            <li>• Valida y sanitiza <span class="text-blue-400">todas las entradas</span></li>
-                            <li>• Implementa <span class="text-yellow-400">whitelisting</span> para parámetros dinámicos</li>
-                            <li>• Usa <span class="text-purple-400">principio de menor privilegio</span></li>
-                            <li>• Activa <span class="text-red-400">logging y monitoreo</span></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recursos adicionales -->
-        <div class="mt-12 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-6">📖 Recursos de Aprendizaje</h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
-                    <h3 class="font-bold text-blue-800 dark:text-blue-200 mb-2">🔗 OWASP SQL Injection</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Guía completa de OWASP sobre prevención de inyecciones SQL.</p>
-                    <a href="#" class="text-blue-600 text-sm hover:underline">Ver guía →</a>
-                </div>
-                
-                <div class="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-l-4 border-green-500">
-                    <h3 class="font-bold text-green-800 dark:text-green-200 mb-2">📋 Checklist de Seguridad</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Lista de verificación para código seguro contra SQLi.</p>
-                    <a href="#" class="text-green-600 text-sm hover:underline">Descargar →</a>
-                </div>
-                
-                <div class="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border-l-4 border-purple-500">
-                    <h3 class="font-bold text-purple-800 dark:text-purple-200 mb-2">🛠️ Herramientas de Testing</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Herramientas para probar tu código contra SQLi.</p>
-                    <a href="#" class="text-purple-600 text-sm hover:underline">Ver herramientas →</a>
-                </div>
-            </div>
-        </div>
+  <!-- BLOCKLY WORKSPACE -->
+  <div id="blocks-mode" class="hidden">
+    <!-- Advertencia para vista de bloques -->
+    <div class="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-600 rounded-lg p-3 mb-4">
+      <div class="flex items-center gap-2">
+        <span class="text-yellow-600 dark:text-yellow-400">⚠️</span>
+        <p class="text-yellow-800 dark:text-yellow-200 font-medium text-sm">Vista en desarrollo</p>
+      </div>
+      <p class="text-yellow-700 dark:text-yellow-300 text-xs mt-1">
+        La funcionalidad de bloques está en fase experimental y puede presentar problemas. 
+        Para mejor experiencia, utiliza la vista de código.
+      </p>
     </div>
+    
+    <div id="blocklyDiv" style="height: 400px; width: 100%; position: relative;"></div>
+  </div>
+</div>
 
-    <script>
-    // --- ESTADO DEL JUEGO Y CONFIGURACIÓN ---
-    const state = {
-        unlockedLevels: [1],
-        completedLevels: [],
-        currentChallenge: 1
-    };
+<!-- ─────────────────── PANEL DERECHO ─────────────────── -->
+<div class="bg-gray-900 rounded-xl shadow-2xl p-6 sticky top-8 h-max">
+  <h2 class="text-2xl font-bold text-gray-200 mb-4">🔬 Guía y Verificación</h2>
 
-    // Desafíos de código seguro
-    const secureChallenges = {
-        1: {
-            name: "Prepared Statements",
-            solution: [
-                "const query = 'SELECT * FROM users WHERE username = ? AND password = ?';",
-                "return db.prepare(query).all(username, password);",
-                "// o db.query(query, [username, password]);"
-            ],
-            vulnerabilities: ["string concatenation", "sql injection"],
-            check: (code) => {
-                const hasPlaceholders = /\?|\$\d+/.test(code);
-                const hasParameterArray = /\[.*username.*password.*\]|\(.*username.*password.*\)|\.all\(.*username.*password.*\)/.test(code);
-                const noConcatenation = !(/\$\{|\+.*username|\+.*password|`.*\$\{/.test(code));
-                const hasPrepareOrQuery = /\.prepare\(|\.query\(/.test(code);
-                
-                return {
-                    secure: hasPlaceholders && hasParameterArray && noConcatenation && hasPrepareOrQuery,
-                    score: (hasPlaceholders ? 30 : 0) + (hasParameterArray ? 30 : 0) + (noConcatenation ? 25 : 0) + (hasPrepareOrQuery ? 15 : 0),
-                    issues: [
-                        !hasPlaceholders ? "Falta usar placeholders (? o $1, $2)" : null,
-                        !hasParameterArray ? "Falta pasar parámetros por separado" : null,
-                        !noConcatenation ? "Aún hay concatenación de strings peligrosa" : null,
-                        !hasPrepareOrQuery ? "Falta usar métodos db.prepare() o db.query()" : null
-                    ].filter(Boolean)
-                };
-            }
-        },
-        2: {
-            name: "Input Validation",
-            solution: [
-                "if (typeof searchTerm !== 'string') throw new Error('Invalid input type');",
-                "if (searchTerm.length > 100) throw new Error('Input too long');",
-                "if (/['\"\\\\;--]/.test(searchTerm)) throw new Error('Invalid characters');",
-                "const query = 'SELECT * FROM products WHERE name LIKE ?';",
-                "return db.prepare(query).all(`%${searchTerm}%`);"
-            ],
-            check: (code) => {
-                const hasTypeCheck = /typeof.*string|instanceof.*String/.test(code);
-                const hasLengthCheck = /length.*>|length.*<|length.*===/.test(code);
-                const hasCharacterCheck = /['\"\\\\;--].*test|test.*['\"\\\\;--]|match.*['\"\\\\;--]/.test(code);
-                const hasPlaceholders = /\?|\$\d+/.test(code);
-                const hasErrorHandling = /throw|return.*error|Error\(/i.test(code);
-                
-                return {
-                    secure: hasTypeCheck && hasLengthCheck && hasCharacterCheck && hasPlaceholders && hasErrorHandling,
-                    score: (hasTypeCheck ? 20 : 0) + (hasLengthCheck ? 20 : 0) + (hasCharacterCheck ? 25 : 0) + (hasPlaceholders ? 20 : 0) + (hasErrorHandling ? 15 : 0),
-                    issues: [
-                        !hasTypeCheck ? "Falta validación de tipo de dato (typeof)" : null,
-                        !hasLengthCheck ? "Falta validación de longitud máxima" : null,
-                        !hasCharacterCheck ? "Falta validación de caracteres peligrosos" : null,
-                        !hasPlaceholders ? "Falta usar prepared statements" : null,
-                        !hasErrorHandling ? "Falta manejo de errores (throw Error)" : null
-                    ].filter(Boolean)
-                };
-            }
-        },
-        3: {
-            name: "Character Escaping",
-            solution: [
-                "const allowedColumns = ['name', 'price', 'category', 'date'];",
-                "const allowedDirections = ['ASC', 'DESC'];",
-                "if (!allowedColumns.includes(orderBy)) throw new Error('Invalid column');",
-                "if (!allowedDirections.includes(direction.toUpperCase())) throw new Error('Invalid direction');",
-                "return `SELECT * FROM products ORDER BY ${orderBy} ${direction.toUpperCase()}`;"
-            ],
-            check: (code) => {
-                const hasWhitelist = /allowedColumns|whitelist.*column|includes.*orderBy/.test(code);
-                const hasDirectionCheck = /allowedDirections|ASC.*DESC/.test(code);
-                const noDirectConcatenation = !/ORDER BY.*\$\{.*\}.*\$\{/.test(code) || hasWhitelist;
-                
-                return {
-                    secure: hasWhitelist && hasDirectionCheck && noDirectConcatenation,
-                    score: (hasWhitelist ? 50 : 0) + (hasDirectionCheck ? 30 : 0) + (noDirectConcatenation ? 20 : 0),
-                    issues: [
-                        !hasWhitelist ? "Falta whitelist para columnas permitidas" : null,
-                        !hasDirectionCheck ? "Falta validación de dirección (ASC/DESC)" : null,
-                        !noDirectConcatenation ? "Concatenación directa sin validación" : null
-                    ].filter(Boolean)
-                };
-            }
-        },
-        4: {
-            name: "ORM Security",
-            solution: [
-                "// Validar entrada",
-                "const id = parseInt(userId);",
-                "if (isNaN(id) || id <= 0) throw new Error('Invalid user ID');",
-                "// Usar métodos seguros del ORM",
-                "return ORM.User.findOne({ where: { id: id, active: 1 } });"
-            ],
-            check: (code) => {
-                const avoidsRawQuery = !/ORM\.query.*\$\{|ORM\.query.*\+/.test(code);
-                const usesORMMethods = /findOne|find|where|findById/.test(code);
-                const hasValidation = /parseInt|isNaN|typeof/.test(code);
-                
-                return {
-                    secure: avoidsRawQuery && usesORMMethods && hasValidation,
-                    score: (avoidsRawQuery ? 40 : 0) + (usesORMMethods ? 40 : 0) + (hasValidation ? 20 : 0),
-                    issues: [
-                        !avoidsRawQuery ? "Aún usa ORM.query() con concatenación" : null,
-                        !usesORMMethods ? "No usa métodos seguros del ORM (findOne, where, etc.)" : null,
-                        !hasValidation ? "Falta validación de entrada" : null
-                    ].filter(Boolean)
-                };
-            }
-        },
-        5: {
-            name: "Code Audit",
-            solution: [
-                "function complexQuery(userInput, sortBy, category) {",
-                "    // Validación de entradas",
-                "    const allowedColumns = ['name', 'price', 'category', 'date_created'];",
-                "    if (!allowedColumns.includes(sortBy)) throw new Error('Invalid sort column');",
-                "    // Prepared statement",
-                "    const params = [];",
-                "    let query = 'SELECT p.*, u.username FROM products p JOIN users u ON p.user_id = u.id WHERE 1=1';",
-                "    if (category) { query += ' AND p.category = ?'; params.push(category); }",
-                "    if (userInput) { query += ' AND p.name LIKE ?'; params.push(`%${userInput}%`); }",
-                "    query += ` ORDER BY p.${sortBy} ASC`;",
-                "    return db.prepare(query).all(params);",
-                "}"
-            ],
-            check: (code) => {
-                const hasColumnWhitelist = /allowedColumns|includes.*sortBy/.test(code);
-                const usesPreparedStatements = /\?.*params|prepare.*all/.test(code);
-                const noConcatenation = !/\$\{category\}|\+.*category|\$\{userInput\}|\+.*userInput/.test(code);
-                const hasParameterArray = /params.*push|params.*\[/.test(code);
-                
-                return {
-                    secure: hasColumnWhitelist && usesPreparedStatements && noConcatenation && hasParameterArray,
-                    score: (hasColumnWhitelist ? 25 : 0) + (usesPreparedStatements ? 35 : 0) + (noConcatenation ? 25 : 0) + (hasParameterArray ? 15 : 0),
-                    issues: [
-                        !hasColumnWhitelist ? "Falta whitelist para columna sortBy" : null,
-                        !usesPreparedStatements ? "No usa prepared statements" : null,
-                        !noConcatenation ? "Aún hay concatenación directa de parámetros" : null,
-                        !hasParameterArray ? "Falta manejo correcto de parámetros" : null
-                    ].filter(Boolean)
-                };
-            }
+  <h3 class="font-semibold text-gray-300 mb-2">Checklist</h3>
+  <ul class="space-y-2 text-sm">
+    <li id="step-1" class="flex items-center gap-2 text-gray-400"><span class="indicator">⚪</span> Usar <code>?</code> en la query.</li>
+    <li id="step-2" class="flex items-center gap-2 text-gray-400"><span class="indicator">⚪</span> Ejecutar pasando tupla de datos.</li>
+    <li id="step-3" class="flex items-center gap-2 text-gray-400 blocks-only"><span class="indicator">⚪</span> Conectar bloques correctamente.</li>
+  </ul>
+
+  <div id="scan-status" class="p-4 rounded-lg mb-4"></div>
+
+  <!-- Código Generado - Solo en modo bloques -->
+  <div id="generated-code-section" class="blocks-only">
+    <h3 class="font-semibold text-gray-300 mb-2">📝 Código Generado</h3>
+    <div class="bg-black/50 rounded-lg p-4 mb-4">
+      <pre id="generated-code" class="text-green-400 font-mono text-xs overflow-x-auto">// Arrastra bloques para generar código...</pre>
+    </div>
+  </div>
+
+  <!-- Banco de Pruebas -->
+  <h3 class="font-semibold text-gray-300 mb-2">🧪 Banco de Pruebas</h3>
+  <p class="text-sm text-gray-400 mb-2">Payload de ataque:</p>
+  <div class="bg-black/50 rounded-lg p-4">
+    <div class="flex gap-2">
+      <input id="test-input" value="' OR '1'='1' --" class="font-fira text-sm w-full bg-gray-700 text-gray-200 rounded-md p-2" />
+      <button id="test-button" onclick="runTest()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700" disabled>Probar</button>
+    </div>
+    <div id="test-result" class="mt-3 text-sm min-h-[40px]"></div>
+  </div>
+
+  <!-- Controles -->
+  <div class="mt-4 space-y-2">
+    <!-- Botones removidos para simplificar la interfaz -->
+  </div>
+</div>
+</div>
+</div>
+
+<!-- Toolbox XML (bloques expandidos por defecto) -->
+<xml id="toolbox" style="display:none">
+  <category name="🚨 Código Vulnerable" colour="#d32f2f" expanded="true">
+    <block type="function_def">
+      <statement name="DO">
+        <block type="vulnerable_query">
+          <next>
+            <block type="vulnerable_exec">
+              <next>
+                <block type="fetch_result">
+                  <next>
+                    <block type="return_result"></block>
+                  </next>
+                </block>
+              </next>
+            </block>
+          </next>
+        </block>
+      </statement>
+    </block>
+    <block type="vulnerable_query"></block>
+    <block type="vulnerable_exec"></block>
+  </category>
+  <category name="✅ Soluciones Seguras" colour="#43a047" expanded="true">
+    <block type="function_def">
+      <statement name="DO">
+        <block type="secure_query">
+          <next>
+            <block type="secure_exec">
+              <next>
+                <block type="fetch_result">
+                  <next>
+                    <block type="return_result"></block>
+                  </next>
+                </block>
+              </next>
+            </block>
+          </next>
+        </block>
+      </statement>
+    </block>
+    <block type="secure_query"></block>
+    <block type="secure_exec"></block>
+    <block type="fetch_result"></block>
+    <block type="return_result"></block>
+  </category>
+  <sep />
+  <category name="🐍 Python Básico" colour="#4b7bec" expanded="false">
+    <block type="text_print">
+      <value name="TEXT">
+        <shadow type="text">
+          <field name="TEXT">Hello World!</field>
+        </shadow>
+      </value>
+    </block>
+    <block type="controls_if"></block>
+    <block type="controls_repeat_ext">
+      <value name="TIMES">
+        <shadow type="math_number">
+          <field name="NUM">10</field>
+        </shadow>
+      </value>
+    </block>
+    <block type="variables_get">
+      <field name="VAR">item</field>
+    </block>
+  </category>
+</xml>
+
+<!-- ─────────────────── JS ─────────────────── -->
+<script>
+const el = id => document.getElementById(id);
+const elements = {
+  codeEditor: el('code-editor'), lineNumbers: el('line-numbers'),
+  statusBox: el('scan-status'), testInput: el('test-input'),
+  testResult: el('test-result'), loading: el('loading-overlay'),
+  testBtn: el('test-button'), blocksMode: el('blocks-mode'),
+  codeMode: el('code-mode'), tabBlocks: el('tab-blocks'),
+  tabCode: el('tab-code'), step1: el('step-1'), 
+  step2: el('step-2'), step3: el('step-3'),
+  generatedCode: el('generated-code')
+};
+
+let pyodide, currentMode = 'code', workspace;
+
+// Código vulnerable por defecto
+const DEFAULT_VULNERABLE_CODE = `def login(db_cursor, username, password):
+    query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
+    db_cursor.execute(query)
+    user = db_cursor.fetchone()
+    return user`;
+
+let isUpdatingFromCode = false;
+let isUpdatingFromBlocks = false;
+
+// Utility function to prevent infinite sync loops
+function withSyncFlag(flagName, fn){
+  if (window[flagName]) return;
+  window[flagName] = true;
+  try { fn(); } finally { window[flagName] = false; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   🧩 DEFINICIÓN DE BLOQUES Y GENERADORES
+   ═══════════════════════════════════════════════════════════════════ */
+
+function defineCustomBlocks() {
+  console.log('Definiendo bloques personalizados...');
+  
+  // Definir bloques personalizados con JSON
+  Blockly.defineBlocksWithJsonArray([
+    {
+      "type": "function_def",
+      "message0": "def login(db_cursor, username, password):",
+      "message1": "%1",
+      "args1": [{"type": "input_statement", "name": "DO"}],
+      "colour": 120,
+      "tooltip": "Define la función de login"
+    },
+    {
+      "type": "vulnerable_query",
+      "message0": "query = f\"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'\"",
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 0,
+      "tooltip": "Query vulnerable con concatenación de strings"
+    },
+    {
+      "type": "vulnerable_exec",
+      "message0": "db_cursor.execute(query)",
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 0,
+      "tooltip": "Ejecuta query sin parámetros (vulnerable)"
+    },
+    {
+      "type": "secure_query",
+      "message0": "query = \"SELECT * FROM users WHERE username = ? AND password = ?\"",
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 120,
+      "tooltip": "Query segura con placeholders"
+    },
+    {
+      "type": "secure_exec",
+      "message0": "db_cursor.execute(query, (username, password))",
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 120,
+      "tooltip": "Ejecuta query con parámetros (seguro)"
+    },
+    {
+      "type": "fetch_result",
+      "message0": "user = db_cursor.fetchone()",
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 230,
+      "tooltip": "Obtiene el resultado de la consulta"
+    },
+    {
+      "type": "return_result",
+      "message0": "return user",
+      "previousStatement": null,
+      "colour": 230,
+      "tooltip": "Retorna el resultado"
+    }
+  ]);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     🐍 GENERADORES DE CÓDIGO PYTHON
+     ═══════════════════════════════════════════════════════════════════ */
+
+  Blockly.Python['function_def'] = function(block) {
+    const branch = Blockly.Python.statementToCode(block, 'DO');
+    return 'def login(db_cursor, username, password):\n' + branch;
+  };
+
+  Blockly.Python['vulnerable_query'] = function(block) {
+    return '    query = f"SELECT * FROM users WHERE username = \'{username}\' AND password = \'{password}\'"\n';
+  };
+
+  Blockly.Python['vulnerable_exec'] = function(block) {
+    return '    db_cursor.execute(query)\n';
+  };
+
+  Blockly.Python['secure_query'] = function(block) {
+    return '    query = "SELECT * FROM users WHERE username = ? AND password = ?"\n';
+  };
+
+  Blockly.Python['secure_exec'] = function(block) {
+    return '    db_cursor.execute(query, (username, password))\n';
+  };
+
+  Blockly.Python['fetch_result'] = function(block) {
+    return '    user = db_cursor.fetchone()\n';
+  };
+
+  Blockly.Python['return_result'] = function(block) {
+    return '    return user\n';
+  };
+
+  console.log('Bloques definidos correctamente');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   🚀 INICIALIZACIÓN
+   ═══════════════════════════════════════════════════════════════════ */
+
+async function init() {
+  try {
+    console.log('Iniciando carga...');
+    
+    // Verificar Blockly
+    if (typeof Blockly === 'undefined') {
+      throw new Error('Blockly no está disponible');
+    }
+    console.log('Blockly disponible');
+
+    // Inicializar el generador Python si no está disponible
+    if (typeof Blockly.Python === 'undefined') {
+      console.log('Inicializando generador Python...');
+      // Crear el generador Python manualmente
+      Blockly.Python = new Blockly.Generator('Python');
+      Blockly.Python.ORDER_ATOMIC = 0;
+      Blockly.Python.ORDER_NEW = 1;
+      Blockly.Python.ORDER_MEMBER = 2;
+      Blockly.Python.ORDER_FUNCTION_CALL = 2;
+      Blockly.Python.ORDER_UNARY_SIGN = 3;
+      Blockly.Python.ORDER_POWER = 4;
+      Blockly.Python.ORDER_MULTIPLICATIVE = 5;
+      Blockly.Python.ORDER_ADDITIVE = 6;
+      Blockly.Python.ORDER_BITWISE_SHIFT = 7;
+      Blockly.Python.ORDER_BITWISE_AND = 8;
+      Blockly.Python.ORDER_BITWISE_XOR = 9;
+      Blockly.Python.ORDER_BITWISE_OR = 10;
+      Blockly.Python.ORDER_RELATIONAL = 11;
+      Blockly.Python.ORDER_LOGICAL_NOT = 12;
+      Blockly.Python.ORDER_LOGICAL_AND = 13;
+      Blockly.Python.ORDER_LOGICAL_OR = 14;
+      Blockly.Python.ORDER_CONDITIONAL = 15;
+      Blockly.Python.ORDER_LAMBDA = 16;
+      Blockly.Python.ORDER_NONE = 99;
+      
+      // Palabras reservadas como string
+      Blockly.Python.RESERVED_WORDS_ = 
+        'and,as,assert,break,class,continue,def,del,elif,else,except,exec,' +
+        'finally,for,from,global,if,import,in,is,lambda,not,or,pass,print,' +
+        'raise,return,try,while,with,yield,' +
+        'True,False,None,NotImplemented,Ellipsis,__debug__,quit,exit,' +
+        'copyright,license,credits,help';
+      
+      Blockly.Python.init = function(workspace) {
+        if (!Blockly.Python.nameDB_) {
+          Blockly.Python.nameDB_ = new Blockly.Names(Blockly.Python.RESERVED_WORDS_);
+        } else {
+          Blockly.Python.nameDB_.reset();
         }
-    };
+        Blockly.Python.nameDB_.setVariableMap(workspace.getVariableMap());
+        Blockly.Python.definitions_ = Object.create(null);
+      };
+      
+      Blockly.Python.finish = function(code) {
+        const definitions = Blockly.Python.definitions_;
+        Blockly.Python.definitions_ = Object.create(null);
+        Blockly.Python.nameDB_.reset();
+        return code;
+      };
+    }
+    console.log('Blockly.Python disponible');
 
-    // Inicialización
-    document.addEventListener('DOMContentLoaded', () => {
-        setupChallengeHandlers();
-        updateProgress();
+    // Definir bloques personalizados
+    defineCustomBlocks();
+
+    // Inicializar Blockly workspace
+    initBlockly();
+    console.log('Workspace inicializado');
+
+    // Inicializar Pyodide en paralelo
+    console.log('Cargando Pyodide...');
+    pyodide = await loadPyodide(); 
+    await pyodide.loadPackage('sqlite3');
+    console.log('Pyodide cargado');
+
+    // DB en memoria
+    pyodide.runPython(`
+import sqlite3, textwrap, sys
+db_connection = sqlite3.connect(":memory:")
+db_cursor = db_connection.cursor()
+db_cursor.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, password TEXT);")
+db_cursor.executemany("INSERT INTO users VALUES (?, ?, ?);", [(1,'admin','pass123'),(2,'juan','qwerty')])
+db_connection.commit()
+`);
+    console.log('Base de datos inicializada');
+
+    // Habilitar controles
+    elements.testBtn.disabled = false;
+
+    elements.loading.style.display = 'none';
+    analyzeSolution();
+    
+    console.log('Inicialización completada');
+    
+  } catch (e) {
+    console.error('Error en inicialización:', e);
+    elements.loading.innerHTML = `<p>Error al cargar: ${e.message}</p>`;
+  }
+}
+
+function initBlockly() {
+  console.log('Inicializando workspace de Blockly...');
+  
+  // Crear el workspace
+  workspace = Blockly.inject('blocklyDiv', {
+    toolbox: document.getElementById('toolbox'),
+    scrollbars: true,
+    trashcan: true,
+    zoom: {
+      controls: true,
+      wheel: true,
+      startScale: 1,
+      maxScale: 3,
+      minScale: 0.3
+    },
+    move: {
+      scrollbars: true,
+      drag: true,
+      wheel: true
+    },
+    grid: {
+      spacing: 20,
+      length: 3,
+      colour: '#ccc',
+      snap: true
+    }
+  });
+
+  // Inicializar el generador Python con el workspace
+  if (Blockly.Python && Blockly.Python.init) {
+    Blockly.Python.init(workspace);
+  }
+
+  // Cargar workspace inicial con código vulnerable
+  const xmlText = `
+<xml>
+  <block type="function_def" x="20" y="20">
+    <statement name="DO">
+      <block type="vulnerable_query">
+        <next>
+          <block type="vulnerable_exec">
+            <next>
+              <block type="fetch_result">
+                <next>
+                  <block type="return_result"></block>
+                </next>
+              </block>
+            </next>
+          </block>
+        </next>
+      </block>
+    </statement>
+  </block>
+</xml>`;
+  
+  try {
+    Blockly.Xml.domToWorkspace(Blockly.Xml.textToDom(xmlText), workspace);
+    console.log('Workspace inicial cargado');
+  } catch (error) {
+    console.error('Error al cargar workspace inicial:', error);
+  }
+
+  // Event listeners para cambios en workspace
+  workspace.addChangeListener(function(event) {
+    if (event.type !== Blockly.Events.UI && !isUpdatingFromCode) {
+      updateGeneratedCode();
+      if (currentMode === 'code') {
+        if (!isUpdatingFromCode) updateCodeEditor();
+      }
+      analyzeSolution();
+    }
+  });
+
+  // Event listener para cambios en el editor de código
+  elements.codeEditor.addEventListener('input', function() {
+    if (!isUpdatingFromBlocks) {
+      updateLines();
+      updateGeneratedCode();
+      analyzeSolution();
+      
+      // Solo actualizar bloques si estamos en modo bloques y hay contenido
+      if (currentMode === 'blocks' && this.value.trim()) {
+        // Debounce para evitar actualizaciones excesivas
+        clearTimeout(this.updateTimer);
+        this.updateTimer = setTimeout(updateBlocksFromCode, 400);
+      }
+    }
+  });
+
+  // Event listener adicional para detectar cambios cuando se cambia de pestaña
+  elements.codeEditor.addEventListener('blur', function() {
+    if (!isUpdatingFromBlocks && currentMode === 'blocks') {
+      updateBlocksFromCode();
+    }
+  });
+
+  // Inicializar con código por defecto
+  elements.codeEditor.value = DEFAULT_VULNERABLE_CODE;
+  updateLines();
+  updateGeneratedCode();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   🎮 CONTROLES Y MODOS
+   ═══════════════════════════════════════════════════════════════════ */
+
+window.changeMode = mode => {
+  currentMode = mode;
+  elements.codeMode.classList.toggle('hidden', mode !== 'code');
+  elements.blocksMode.classList.toggle('hidden', mode !== 'blocks');
+  elements.tabCode.classList.toggle('active', mode === 'code');
+  elements.tabBlocks.classList.toggle('active', mode === 'blocks');
+  
+  // Controlar visibilidad de elementos específicos de cada modo
+  const rightPanel = document.querySelector('.bg-gray-900');
+  if (mode === 'blocks') {
+    rightPanel.classList.add('code-mode-active');
+  } else {
+    rightPanel.classList.remove('code-mode-active');
+  }
+  
+  if (mode === 'blocks') {
+    // Al cambiar a bloques, actualizar los bloques con el código del editor
+    updateBlocksFromCode();
+    // Asegurar que el workspace se redibuje correctamente
+    setTimeout(() => {
+      if (workspace) {
+        workspace.resizeContents();
+        workspace.render();
+      }
+    }, 200);
+  } else if (mode === 'code') {
+    // Al cambiar a código, actualizar el editor con el código actual de los bloques si es necesario
+    // Solo si el editor está vacío o tiene el código por defecto
+    if (!elements.codeEditor.value.trim() || elements.codeEditor.value === DEFAULT_VULNERABLE_CODE) {
+      updateCodeEditor();
+    }
+  }
+  
+  // Actualizar el código mostrado en el panel derecho
+  updateGeneratedCode();
+  analyzeSolution();
+};
+
+function updateGeneratedCode() {
+  const code = currentMode === 'code'
+      ? elements.codeEditor.value
+      : Blockly.Python.workspaceToCode(workspace) || '// Vacío';
+  elements.generatedCode.textContent = code;
+}
+
+function updateCodeEditor() {
+  withSyncFlag('isUpdatingFromBlocks', () => {
+    const code = Blockly.Python.workspaceToCode(workspace) || DEFAULT_VULNERABLE_CODE;
+    elements.codeEditor.value = code;
+    updateLines();
+    updateGeneratedCode();
+  });
+}
+
+// Nueva función para actualizar bloques desde código
+function updateBlocksFromCode() {
+  withSyncFlag('isUpdatingFromCode', () => {
+    const code = elements.codeEditor.value.trim();
+    if (!code) return;
+
+    /* 1. Analizar → lista de bloques */
+    const blocks = parseCodeToBlocks(code);
+    if (!blocks.length) return;
+
+    /* 2. Cargar en workspace sin disparar eventos */
+    Blockly.Events.disable();
+    try {
+      workspace.clear();
+      loadBlocksToWorkspace(blocks);
+    } finally {
+      Blockly.Events.enable();
+    }
+
+    /* 3. Refrescar vistas derivadas */
+    updateGeneratedCode();
+  });
+}
+
+// Función para parsear código y convertir a estructura de bloques
+function parseCodeToBlocks(code) {
+  const lines = code.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+  const blocks = [];
+  
+  let inFunction = false;
+  
+  for (const line of lines) {
+    if (line.startsWith('def login(')) {
+      blocks.push({ type: 'function_def' });
+      inFunction = true;
+    } else if (inFunction) {
+      // Detectar query vulnerable (con f-strings o concatenación)
+      if (line.includes('f"SELECT') || line.includes("f'SELECT") || 
+          line.includes(`'{username}'`) || line.includes(`'{password}'`)) {
+        blocks.push({ type: 'vulnerable_query' });
+      }
+      // Detectar query segura (con placeholders ?)
+      else if ((line.includes('"SELECT') || line.includes("'SELECT")) && 
+               line.includes('?') && line.includes('username') && line.includes('password')) {
+        blocks.push({ type: 'secure_query' });
+      }
+      // Detectar ejecución vulnerable (sin parámetros)
+      else if (line.includes('execute(query)') && !line.includes('execute(query,')) {
+        blocks.push({ type: 'vulnerable_exec' });
+      }
+      // Detectar ejecución segura (con parámetros)
+      else if ((line.includes('execute(query,') || line.includes('execute(query, (')) &&
+               line.includes('username') && line.includes('password')) {
+        blocks.push({ type: 'secure_exec' });
+      }
+      // Detectar fetchone
+      else if (line.includes('fetchone()')) {
+        blocks.push({ type: 'fetch_result' });
+      }
+      // Detectar return
+      else if (line.includes('return')) {
+        blocks.push({ type: 'return_result' });
+      }
+    }
+  }
+  
+  return blocks;
+}
+
+// Función para cargar bloques al workspace
+function loadBlocksToWorkspace(blocks) {
+  if (blocks.length === 0) return;
+  
+  let xmlText = '<xml>';
+  
+  if (blocks[0].type === 'function_def') {
+    xmlText += '<block type="function_def" x="20" y="20">';
+    
+    if (blocks.length > 1) {
+      xmlText += '<statement name="DO">';
+      
+      for (let i = 1; i < blocks.length; i++) {
+        if (i === 1) {
+          xmlText += `<block type="${blocks[i].type}">`;
+        } else {
+          xmlText += `<next><block type="${blocks[i].type}">`;
+        }
+      }
+      
+      // Cerrar los next blocks
+      for (let i = 2; i < blocks.length; i++) {
+        xmlText += '</block></next>';
+      }
+      if (blocks.length > 1) {
+        xmlText += '</block>';
+      }
+      
+      xmlText += '</statement>';
+    }
+    
+    xmlText += '</block>';
+  }
+  
+  xmlText += '</xml>';
+  
+  try {
+    Blockly.Xml.domToWorkspace(Blockly.Xml.textToDom(xmlText), workspace);
+  } catch (error) {
+    console.error('Error cargando bloques:', error);
+  }
+}
+
+// Función de fallback para generar código manualmente
+function generateCodeManually(workspace) {
+  const blocks = workspace.getAllBlocks();
+  let code = '';
+  
+  // Buscar el bloque principal (function_def)
+  const mainBlock = blocks.find(block => block.type === 'function_def');
+  if (!mainBlock) {
+    return '# No se encontró bloque de función';
+  }
+  
+  code += 'def login(db_cursor, username, password):\n';
+  
+  // Obtener bloques conectados
+  let currentBlock = mainBlock.getInputTargetBlock('DO');
+  while (currentBlock) {
+    switch (currentBlock.type) {
+      case 'vulnerable_query':
+        code += '    query = f"SELECT * FROM users WHERE username = \'{username}\' AND password = \'{password}\'"\n';
+        break;
+      case 'secure_query':
+        code += '    query = "SELECT * FROM users WHERE username = ? AND password = ?"\n';
+        break;
+      case 'vulnerable_exec':
+        code += '    db_cursor.execute(query)\n';
+        break;
+      case 'secure_exec':
+        code += '    db_cursor.execute(query, (username, password))\n';
+        break;
+      case 'fetch_result':
+        code += '    user = db_cursor.fetchone()\n';
+        break;
+      case 'return_result':
+        code += '    return user\n';
+        break;
+    }
+    currentBlock = currentBlock.getNextBlock();
+  }
+  
+  return code;
+}
+
+function updateLines() {
+  const code = elements.codeEditor.value;
+  elements.lineNumbers.innerHTML = code.split('\n').map((_, i) => i + 1).join('<br>');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   🔍 ANÁLISIS DE SEGURIDAD
+   ═══════════════════════════════════════════════════════════════════ */
+
+function analyzeSolution() {
+  if (!workspace) {
+    return;
+  }
+  
+  try {
+    let code;
+    
+    // Usar el código del editor si estamos en modo código, o generar desde bloques
+    if (currentMode === 'code') {
+      code = elements.codeEditor.value;
+    } else {
+      if (Blockly.Python && typeof Blockly.Python.workspaceToCode === 'function') {
+        code = Blockly.Python.workspaceToCode(workspace);
+      } else {
+        code = generateCodeManually(workspace);
+      }
+    }
+    
+    // Verificar patrones de seguridad
+    const hasSecureQuery = code.includes('username = ?') && code.includes('password = ?');
+    const hasSecureExec = code.includes('execute(query, (username, password))') || 
+                         code.includes('execute(query,(username,password))');
+    const hasBlocks = workspace.getAllBlocks().length > 1 || code.trim().length > 0;
+    
+    // Verificar vulnerabilidades
+    const isVulnerable = code.includes('f"SELECT') || code.includes("f'SELECT") ||
+                        code.includes(`'{username}'`) || code.includes(`'{password}'`);
+    
+    // Actualizar checklist
+    setStep(elements.step1, hasSecureQuery);
+    setStep(elements.step2, hasSecureExec);
+    setStep(elements.step3, hasBlocks);
+    
+    // Actualizar status
+    if (hasSecureQuery && hasSecureExec) {
+      setStatus('✅ ¡CÓDIGO SEGURO!', 'green', 
+        'Excelente, la consulta está parametrizada correctamente.');
+    } else if (isVulnerable) {
+      setStatus('🚨 ¡VULNERABLE!', 'red', 
+        'Detectada concatenación de strings. Usa placeholders (?) en su lugar.');
+    } else {
+      setStatus('🤔 En progreso', 'yellow', 
+        'Construye tu función de login arrastrando los bloques correctos.');
+    }
+  } catch (error) {
+    console.error('Error analizando solución:', error);
+  }
+}
+
+function setStep(elm, ok) {
+  elm.classList.toggle('text-green-400', ok);
+  elm.classList.toggle('text-gray-400', !ok);
+  elm.querySelector('.indicator').textContent = ok ? '✅' : '⚪';
+}
+
+function setStatus(title, color, msg) {
+  elements.statusBox.className = `p-4 rounded-lg mb-4 bg-${color}-100 dark:bg-${color}-900/40`;
+  elements.statusBox.innerHTML = `<h3 class="font-bold text-${color}-800 dark:text-${color}-200">${title}</h3><p class="text-sm mt-1 text-${color}-700 dark:text-${color}-300">${msg}</p>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   🧪 TESTING
+   ═══════════════════════════════════════════════════════════════════ */
+
+window.runTest = async () => {
+  if (!pyodide) {
+    elements.testResult.innerHTML = '<p class="text-red-400">Sistema no inicializado</p>';
+    return;
+  }
+  
+  try {
+    const payload = elements.testInput.value;
+    let userCode;
+    
+    // Obtener código según el modo actual
+    if (currentMode === 'code') {
+      userCode = elements.codeEditor.value;
+    } else {
+      if (Blockly.Python && typeof Blockly.Python.workspaceToCode === 'function') {
+        userCode = Blockly.Python.workspaceToCode(workspace);
+      } else {
+        userCode = generateCodeManually(workspace);
+      }
+    }
+    
+    if (!userCode || userCode.trim() === '') {
+      elements.testResult.innerHTML = '<p class="text-red-400">No hay código para probar</p>';
+      return;
+    }
+    
+    elements.testResult.innerHTML = '<p class="text-blue-400">🔍 Ejecutando prueba de inyección SQL...</p>';
+    
+    // Crear el código de prueba completo
+    const testCode = `
+# Preparar base de datos de prueba
+import sqlite3
+db_connection = sqlite3.connect(":memory:")
+db_cursor = db_connection.cursor()
+db_cursor.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, password TEXT);")
+db_cursor.executemany("INSERT INTO users VALUES (?, ?, ?);", [
+    (1, 'admin', 'pass123'),
+    (2, 'juan', 'qwerty'),
+    (3, 'maria', 'secret456')
+])
+db_connection.commit()
+
+# Código del usuario
+${userCode}
+
+# Prueba con payload de inyección
+payload = """${payload}"""
+password_test = "whatever"
+
+print("=== PRUEBA DE INYECCIÓN SQL ===")
+print(f"Payload usado: {payload}")
+print(f"Password: {password_test}")
+print()
+
+try:
+    result = login(db_cursor, payload, password_test)
+    
+    print("=== RESPUESTA DE LA BASE DE DATOS ===")
+    if result:
+        print(f"Resultado devuelto: {result}")
+        console.log(result);
+        print(f"Tipo: {type(result)}")
+        if isinstance(result, tuple) and len(result) >= 2:
+            print(f"ID: {result[0]}, Username: {result[1]}, Password: {result[2] if len(result) > 2 else 'N/A'}")
+        
+        # Verificar todos los usuarios para detectar inyección masiva
+        db_cursor.execute("SELECT * FROM users")
+        all_users = db_cursor.fetchall();
+        console.log(all_users);
+        print(f"\\nTodos los usuarios en la base de datos:")
+        for user in all_users:
+            print(f"  - ID: {user[0]}, Username: {user[1]}, Password: {user[2]}")
+        
+        print("\\n🚨 RESULTADO: VULNERABLE")
+        print("   ¡La inyección SQL funcionó!")
+        print("   El código no está protegido contra inyección SQL.")
+        
+        output_result = "VULNERABLE"
+        output_data = {
+            "result": result,
+            "all_users": all_users,
+            "user_found": result[1] if result and len(result) > 1 else "Desconocido"
+        }
+    else:
+        print("Resultado: None (no se encontró usuario)")
+        print("\\n✅ RESULTADO: PROTEGIDO")
+        print("   No se encontró usuario con el payload.")
+        print("   El código rechazó correctamente la inyección SQL.")
+        output_result = "PROTEGIDO"
+        output_data = {"result": None};
+        
+except Exception as e:
+    print(f"\\n⚠️ EXCEPCIÓN CAPTURADA: {str(e)}")
+    print("\\n✅ RESULTADO: ERROR CONTROLADO")
+    print("   El código falló de manera segura.")
+    print("   Esto generalmente indica protección contra inyección SQL.")
+    output_result = "ERROR_CONTROLADO"
+    output_data = {"error": str(e)};
+
+import json
+json.dumps({"status": output_result, "data": output_data})
+`;
+
+    const result = await pyodide.runPythonAsync(testCode);
+    
+    let resultData;
+    try {
+      resultData = JSON.parse(result);
+    } catch {
+      resultData = { status: "ERROR", data: {} };
+    }
+    
+    // Mostrar resultado visual detallado
+    if (resultData.status === 'VULNERABLE') {
+      const userData = resultData.data;
+      elements.testResult.innerHTML = `
+        <div class="bg-red-900/50 border border-red-600 rounded-lg p-3">
+          <p class="text-red-400 font-bold">🚨 CÓDIGO VULNERABLE</p>
+          <p class="text-red-300 text-xs mt-1">La inyección SQL fue exitosa. El payload logró acceder a datos no autorizados.</p>
+          
+          <div class="mt-3 bg-black/30 rounded p-2">
+            <p class="text-red-200 text-xs font-semibold">📊 Respuesta de la base de datos:</p>
+            <p class="text-red-100 text-xs mt-1">Usuario encontrado: <span class="font-mono">${userData.user_found}</span></p>
+            <p class="text-red-100 text-xs">Datos completos: <span class="font-mono">${JSON.stringify(userData.result)}</span></p>
+            ${userData.all_users && userData.all_users.length > 1 ? 
+              `<p class="text-red-100 text-xs mt-1">⚠️ Se expusieron ${userData.all_users.length} usuarios total</p>` : ''}
+          </div>
+          
+          <p class="text-red-200 text-xs mt-2"><strong>Recomendación:</strong> Usa consultas parametrizadas con placeholders (?)</p>
+        </div>`;
+    } else if (resultData.status === 'PROTEGIDO') {
+      elements.testResult.innerHTML = `
+        <div class="bg-green-900/50 border border-green-600 rounded-lg p-3">
+          <p class="text-green-400 font-bold">✅ CÓDIGO SEGURO</p>
+          <p class="text-green-300 text-xs mt-1">El código rechazó correctamente la inyección SQL.</p>
+          
+          <div class="mt-3 bg-black/30 rounded p-2">
+            <p class="text-green-200 text-xs font-semibold">📊 Respuesta de la base de datos:</p>
+            <p class="text-green-100 text-xs mt-1">Resultado: <span class="font-mono">None</span></p>
+            <p class="text-green-100 text-xs">El payload fue rechazado y no se devolvieron datos.</p>
+          </div>
+          
+          <p class="text-green-200 text-xs mt-2"><strong>¡Excelente!</strong> Las consultas parametrizadas funcionan correctamente.</p>
+        </div>`;
+    } else {
+      const errorMsg = resultData.data?.error || 'Error desconocido';
+      elements.testResult.innerHTML = `
+        <div class="bg-yellow-900/50 border border-yellow-600 rounded-lg p-3">
+          <p class="text-yellow-400 font-bold">⚠️ ERROR EN EJECUCIÓN</p>
+          <p class="text-yellow-300 text-xs mt-1">El código falló durante la ejecución, pero esto puede ser seguro.</p>
+          
+          <div class="mt-3 bg-black/30 rounded p-2">
+            <p class="text-yellow-200 text-xs font-semibold">📊 Error capturado:</p>
+            <p class="text-yellow-100 text-xs mt-1 font-mono">${errorMsg}</p>
+          </div>
+          
+          <p class="text-yellow-200 text-xs mt-2">Verifica que tu función esté correctamente implementada.</p>
+        </div>`;
+    }
+    
+  } catch (error) {
+    console.error('Error en prueba:', error);
+    elements.testResult.innerHTML = `
+      <div class="bg-red-900/50 border border-red-600 rounded-lg p-3">
+        <p class="text-red-400 font-bold">❌ ERROR EN PRUEBA</p>
+        <p class="text-red-300 text-xs mt-1">${error.message}</p>
+      </div>`;
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   🏁 INICIALIZACIÓN FINAL
+   ═══════════════════════════════════════════════════════════════════ */
+
+// Usar window.onload en lugar de DOMContentLoaded para asegurar que todos los scripts estén cargados
+window.onload = function() {
+  console.log('Window loaded, iniciando aplicación...');
+  
+  // Pequeño delay para asegurar que Blockly esté completamente inicializado
+  setTimeout(() => {
+    init().catch(error => {
+      console.error('Error en inicialización:', error);
+      if (elements.loading) {
+        elements.loading.innerHTML = `<p>Error: ${error.message}</p>`;
+      }
     });
+  }, 500);
+};
+</script>
 
-    function setupChallengeHandlers() {
-        for (let i = 1; i <= 5; i++) {
-            const btn = document.getElementById(`btn-${i}`);
-            const textarea = document.getElementById(`input-${i}-code`);
-            
-            if (btn && textarea) {
-                btn.addEventListener('click', () => handleSecureCodeSubmit(i));
-                textarea.addEventListener('input', () => {
-                    handleRealtimeSecurityAnalysis(i);
-                    updateCodePreview(i);
-                    updateStepProgress(i);
-                });
-                
-                // Trigger initial analysis
-                handleRealtimeSecurityAnalysis(i);
-                updateCodePreview(i);
-            }
-        }
-    }
-
-    function updateCodePreview(id) {
-        const textarea = document.getElementById(`input-${id}-code`);
-        const preview = document.getElementById(`code-preview-${id}`);
-        
-        if (!textarea || !preview) return;
-        
-        const code = textarea.value.trim();
-        if (!code) {
-            preview.textContent = '// Escribe código arriba para ver el análisis en tiempo real...';
-            return;
-        }
-
-        const challenge = secureChallenges[id];
-        const analysis = challenge.check(code);
-        
-        // Crear preview con highlighting
-        let previewText = `// Análisis en tiempo real de tu código:\n\n${code}\n\n`;
-        previewText += `// 📊 Estado: ${analysis.secure ? '✅ SEGURO' : '❌ VULNERABLE'}\n`;
-        previewText += `// 🏆 Puntuación: ${analysis.score}/100\n`;
-        
-        if (analysis.issues.length > 0) {
-            previewText += `\n// ⚠️ Problemas detectados:\n`;
-            analysis.issues.forEach(issue => {
-                previewText += `// • ${issue}\n`;
-            });
-        } else {
-            previewText += `\n// ✅ ¡Excelente! No se detectaron problemas\n`;
-        }
-
-        preview.textContent = previewText;
-        
-        // Aplicar colores basados en seguridad
-        preview.className = analysis.secure ? 
-            'text-sm m-0 whitespace-pre-wrap code-highlight-safe' : 
-            'text-sm m-0 whitespace-pre-wrap code-highlight-vuln';
-    }
-
-    function updateStepProgress(id) {
-        const textarea = document.getElementById(`input-${id}-code`);
-        if (!textarea) return;
-        
-        const code = textarea.value.trim();
-        const challenge = secureChallenges[id];
-        const analysis = challenge.check(code);
-        
-        // Actualizar indicadores de pasos según el desafío
-        if (id === 1) {
-            updateStep(1, 1, /\?|\$\d+/.test(code));
-            updateStep(1, 2, /\[.*username.*password.*\]|\(.*username.*password.*\)/.test(code));
-            updateStep(1, 3, /prepare|query.*\[/.test(code));
-        } else if (id === 2) {
-            updateStep(2, 1, /typeof.*string/.test(code));
-            updateStep(2, 2, /length.*>|length.*</.test(code));
-            updateStep(2, 3, /['\"\\\\;--]/.test(code) && /test|match/.test(code));
-            updateStep(2, 4, /\?|\$\d+/.test(code) && /prepare|query.*\[/.test(code));
-        }
-    }
-
-    function updateStep(challengeId, stepNum, completed) {
-        const indicator = document.getElementById(`indicator-${challengeId}-${stepNum}`);
-        if (!indicator) return;
-        
-        indicator.className = 'step-indicator';
-        if (completed) {
-            indicator.className += ' completed';
-        }
-    }
-
-    function handleSecureCodeSubmit(id) {
-        const textarea = document.getElementById(`input-${id}-code`);
-        const result = document.getElementById(`result-${id}`);
-        const code = textarea.value.trim();
-        
-        if (!code) {
-            showResult(result, 'Por favor, escribe algo de código.', 'error');
-            return;
-        }
-
-        const challenge = secureChallenges[id];
-        const analysis = challenge.check(code);
-        
-        if (analysis.secure) {
-            showResult(result, `✅ ¡Excelente! Tu código es seguro. Puntuación: ${analysis.score}/100`, 'success');
-            completeChallenge(id);
-        } else {
-            const issues = analysis.issues.join('<br>• ');
-            showResult(result, `❌ Código inseguro. Puntuación: ${analysis.score}/100<br><br>Problemas encontrados:<br>• ${issues}`, 'error');
-        }
-        
-        updateSecurityAnalysis(code, analysis, challenge.vulnerabilities);
-    }
-
-    function handleRealtimeSecurityAnalysis(id) {
-        const textarea = document.getElementById(`input-${id}-code`);
-        if (!textarea) return;
-        
-        const code = textarea.value.trim();
-        
-        if (!code) {
-            updateSecurityStatus('// Esperando código para analizar...', 'ESPERANDO', 0);
-            return;
-        }
-
-        const challenge = secureChallenges[id];
-        if (!challenge) return;
-        
-        const analysis = challenge.check(code);
-        updateSecurityAnalysis(code, analysis, challenge.vulnerabilities);
-    }
-
-    function updateSecurityAnalysis(code, analysis, knownVulns) {
-        // Actualizar estado de seguridad
-        const status = analysis.secure ? 'CÓDIGO SEGURO' : 'VULNERABILIDADES DETECTADAS';
-        const statusClass = analysis.secure ? 'vuln-safe' : 'vuln-vulnerable';
-        
-        const vulnStatusEl = document.getElementById('vulnerability-status');
-        const scoreEl = document.getElementById('security-score');
-        
-        if (vulnStatusEl) {
-            vulnStatusEl.textContent = status;
-            vulnStatusEl.className = `vulnerability-indicator ${statusClass}`;
-        }
-        
-        if (scoreEl) {
-            scoreEl.textContent = `Puntuación: ${analysis.score}/100`;
-        }
-        
-        // Mostrar código analizado
-        const securityStatus = document.getElementById('security-status');
-        if (securityStatus) {
-            let displayCode = `// Analizando código...\n\n${code}\n\n`;
-            displayCode += `// Estado: ${analysis.secure ? '✅ SEGURO' : '❌ VULNERABLE'}\n`;
-            displayCode += `// Puntuación: ${analysis.score}/100`;
-            securityStatus.textContent = displayCode;
-        }
-        
-        // Mostrar vulnerabilidades
-        const vulnContent = document.getElementById('vulnerabilities-content');
-        if (vulnContent) {
-            if (analysis.issues.length > 0) {
-                vulnContent.innerHTML = analysis.issues.map(issue => `<div class="text-red-400 mb-1">🚨 ${issue}</div>`).join('');
-            } else {
-                vulnContent.innerHTML = '<div class="text-green-400">✅ No se detectaron vulnerabilidades</div>';
-            }
-        }
-        
-        // Mostrar recomendaciones
-        const recContent = document.getElementById('recommendations-content');
-        if (recContent) {
-            const recommendations = generateRecommendations(analysis, knownVulns);
-            recContent.innerHTML = recommendations.map(rec => `<div class="text-blue-400 mb-1">💡 ${rec}</div>`).join('');
-        }
-    }
-
-    function updateSecurityStatus(message, type, score = 0) {
-        const securityStatus = document.getElementById('security-status');
-        if (securityStatus) {
-            securityStatus.textContent = message;
-        }
-        
-        const vulnStatus = document.getElementById('vulnerability-status');
-        if (vulnStatus) {
-            vulnStatus.textContent = type;
-            vulnStatus.className = `vulnerability-indicator ${type === 'ESPERANDO' ? 'vuln-safe' : 'vuln-vulnerable'}`;
-        }
-        
-        const scoreEl = document.getElementById('security-score');
-        if (scoreEl) {
-            scoreEl.textContent = `Puntuación: ${score}/100`;
-        }
-    }
-
-    function generateRecommendations(analysis, vulnerabilities) {
-        const recommendations = [];
-        
-        if (analysis.issues.includes('Falta usar placeholders (? o $1, $2)')) {
-            recommendations.push('Usa placeholders (?) en lugar de concatenación');
-        }
-        if (analysis.issues.some(issue => issue.includes('validación'))) {
-            recommendations.push('Implementa validación robusta de entrada');
-        }
-        if (analysis.issues.some(issue => issue.includes('whitelist'))) {
-            recommendations.push('Usa whitelisting para parámetros dinámicos');
-        }
-        if (analysis.issues.some(issue => issue.includes('ORM'))) {
-            recommendations.push('Evita consultas raw en ORMs');
-        }
-        
-        if (recommendations.length === 0) {
-            recommendations.push('¡Excelente trabajo! El código parece seguro');
-        }
-        
-        return recommendations;
-    }
-
-    function updateSecurityStatus(message, type) {
-        const securityStatus = document.getElementById('security-status');
-        securityStatus.textContent = message;
-        
-        const vulnStatus = document.getElementById('vulnerability-status');
-        vulnStatus.textContent = type;
-        vulnStatus.className = `vulnerability-indicator ${type === 'ESPERANDO' ? 'vuln-safe' : 'vuln-vulnerable'}`;
-    }
-
-    function showResult(element, message, type) {
-        element.innerHTML = message;
-        element.className = `mt-4 p-3 rounded-md text-sm min-h-[50px] ${
-            type === 'success' ? 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200' :
-            type === 'error' ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200' :
-            'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200'
-        }`;
-    }
-
-    function completeChallenge(id) {
-        if (!state.completedLevels.includes(id)) {
-            state.completedLevels.push(id);
-            
-            // Desbloquear siguiente nivel
-            if (id < 5 && !state.unlockedLevels.includes(id + 1)) {
-                state.unlockedLevels.push(id + 1);
-                unlockChallenge(id + 1);
-                showToast(`¡Nivel ${id + 1} desbloqueado!`);
-            }
-            
-            updateProgress();
-        }
-    }
-
-    function unlockChallenge(id) {
-        const challenge = document.getElementById(`challenge-${id}`);
-        if (challenge) {
-            challenge.classList.remove('locked');
-            challenge.classList.add('border-green-500');
-        }
-    }
-
-    function updateProgress() {
-        const totalChallenges = 5;
-        const completedCount = state.completedLevels.length;
-        const percentage = (completedCount / totalChallenges) * 100;
-        
-        document.getElementById('progress-bar').style.width = `${percentage}%`;
-        document.getElementById('progress-text').textContent = 
-            `${percentage.toFixed(0)}% completado - ${completedCount}/${totalChallenges} desafíos completados`;
-    }
-
-    function toggleHint(id) {
-        const hint = document.getElementById(`hint-${id}`);
-        hint.classList.toggle('hidden');
-    }
-
-    function showToast(message) {
-        const toast = document.getElementById('toast');
-        const toastMessage = document.getElementById('toast-message');
-        
-        toastMessage.textContent = message;
-        toast.classList.add('show');
-        
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 3000);
-    }
-    </script>
+<!-- Pie de página -->
+<footer class="text-center mt-12 py-6 border-t border-gray-200 dark:border-gray-700">
+  <p class="text-gray-600 dark:text-gray-400 text-sm">
+    Simulador Educativo de SQLI <br> 
+    make with ❤️ by <a href="https://www.linkedin.com/in/martin-munoz/" target="_blank" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 transition-colors">Martin Muñoz</a>
+  </p>
+</footer>
 
 </body>
 </html>
