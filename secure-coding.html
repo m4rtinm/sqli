@@ -1066,5 +1066,61 @@ window.onload = function() {
   </p>
 </footer>
 
+    <script type="module">
+    let SQL;
+    export const db = {};
+
+    export async function initializeSqlJs() {
+        SQL = await initSqlJs({
+            locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
+        });
+        await setupAllChallengeDatabases();
+    }
+
+    async function setupAllChallengeDatabases() {
+        if (!SQL) throw new Error('sql.js no inicializado');
+
+        // Desafío 1: Login Roto
+        db[1] = new SQL.Database();
+        db[1].run("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT);");
+        db[1].run("INSERT INTO users (username, password) VALUES ('admin', 'ultra-secret-password-123');");
+        db[1].run("INSERT INTO users (username, password) VALUES ('juan', 'password123');");
+        db[1].run("INSERT INTO users (username, password) VALUES ('ana', 'qwerty');");
+
+        // Desafío 2,4,5: Buscador Curioso y UNION
+        db[2] = new SQL.Database();
+        db[2].run("CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, price REAL);");
+        db[2].run("INSERT INTO products (name, description, price) VALUES ('Laptop Pro', 'Potente laptop para profesionales.', 1200.50);");
+        db[2].run("INSERT INTO products (name, description, price) VALUES ('Teclado Mec\u00e1nico RGB', 'Teclado con switches cherry-mx.', 75.00);");
+        db[2].run("INSERT INTO products (name, description, price) VALUES ('Monitor Ultrawide', 'Monitor de 34 pulgadas curvo.', 450.99);");
+        db[2].run("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT, email TEXT);");
+        db[2].run("INSERT INTO users (username, password, email) VALUES ('admin', 'adminPass123!', 'admin@example.com');");
+        db[2].run("INSERT INTO users (username, password, email) VALUES ('user1', 'securePass!', 'user1@example.com');");
+        db[2].run("INSERT INTO users (username, password, email) VALUES ('user2', 'password123', 'user2@example.com');");
+        db[4] = db[2];
+        db[5] = db[2];
+
+        // Desafío 3: Cupón Paciente
+        db[3] = new SQL.Database();
+        db[3].run("CREATE TABLE coupons (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, discount REAL, expiry_date TEXT);");
+        db[3].run("INSERT INTO coupons (code, discount, expiry_date) VALUES ('SUMMER20', 0.20, '2024-08-31');");
+        db[3].run("INSERT INTO coupons (code, discount, expiry_date) VALUES ('SAVE10NOW', 0.10, '2024-12-31');");
+
+        // Desafío 6: Subconsulta Maliciosa
+        db[6] = new SQL.Database();
+        db[6].run("CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, owner_id INTEGER);");
+        db[6].run("INSERT INTO items (name, owner_id) VALUES ('Documento Secreto', 1);");
+        db[6].run("INSERT INTO items (name, owner_id) VALUES ('Llave Maestra', 1);");
+        db[6].run("INSERT INTO items (name, owner_id) VALUES ('Notas P\u00fablicas', 2);");
+        db[6].run("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, role TEXT);");
+        db[6].run("INSERT INTO users (username, role) VALUES ('admin', 'administrator');");
+        db[6].run("INSERT INTO users (username, role) VALUES ('guest', 'visitor');");
+
+        console.log('Bases de datos de c\u00f3digo seguro creadas');
+    }
+
+    initializeSqlJs();
+    </script>
+
 </body>
 </html>
